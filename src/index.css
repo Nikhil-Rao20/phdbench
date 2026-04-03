@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-primary:   #f6f5f0;
+    --bg-card:      #ffffff;
+    --bg-sidebar:   #1a1914;
+    --text-primary: #1a1914;
+    --text-muted:   #7a705e;
+    --border:       #d8d4c4;
+    --accent:       #448d65;
+    --accent-light: #deeee6;
+  }
+
+  html { @apply font-body antialiased; }
+
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+  }
+
+  * { @apply border-ink-200; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #b8b19a; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #7a705e; }
+}
+
+@layer components {
+  .card {
+    @apply bg-white rounded-2xl border border-ink-100 shadow-sm;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-4 py-2.5 rounded-xl
+           bg-ink-900 text-ink-50 text-sm font-medium
+           hover:bg-ink-800 active:scale-95
+           transition-all duration-150;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center gap-2 px-4 py-2.5 rounded-xl
+           bg-white text-ink-700 text-sm font-medium border border-ink-200
+           hover:bg-ink-50 hover:border-ink-300 active:scale-95
+           transition-all duration-150;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-3 py-2 rounded-lg
+           text-ink-500 text-sm
+           hover:bg-ink-100 hover:text-ink-800 active:scale-95
+           transition-all duration-150;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center gap-2 px-4 py-2.5 rounded-xl
+           bg-rose-600 text-white text-sm font-medium
+           hover:bg-rose-700 active:scale-95
+           transition-all duration-150;
+  }
+
+  .input {
+    @apply w-full px-3.5 py-2.5 rounded-xl border border-ink-200 bg-ink-50
+           text-ink-800 text-sm placeholder-ink-400
+           focus:outline-none focus:ring-2 focus:ring-sage-400 focus:border-transparent
+           transition-all duration-150;
+  }
+
+  .select {
+    @apply w-full px-3.5 py-2.5 rounded-xl border border-ink-200 bg-ink-50
+           text-ink-800 text-sm
+           focus:outline-none focus:ring-2 focus:ring-sage-400 focus:border-transparent
+           transition-all duration-150 cursor-pointer;
+  }
+
+  .textarea {
+    @apply w-full px-3.5 py-2.5 rounded-xl border border-ink-200 bg-ink-50
+           text-ink-800 text-sm placeholder-ink-400 resize-none
+           focus:outline-none focus:ring-2 focus:ring-sage-400 focus:border-transparent
+           transition-all duration-150;
+  }
+
+  .label {
+    @apply block text-xs font-medium text-ink-500 uppercase tracking-wider mb-1.5;
+  }
+
+  /* Status badges */
+  .badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium;
+  }
+  .badge-lead       { @apply bg-sky-100 text-sky-700; }
+  .badge-applied    { @apply bg-amber-100 text-amber-700; }
+  .badge-emailed    { @apply bg-sage-100 text-sage-700; }
+  .badge-interview  { @apply bg-rose-100 text-rose-700; }
+  .badge-offer      { @apply bg-green-100 text-green-700; }
+  .badge-rejected   { @apply bg-ink-100 text-ink-500; }
+  .badge-converted  { @apply bg-sage-100 text-sage-700; }
+
+  /* Nav item */
+  .nav-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm
+           text-ink-300 hover:text-white hover:bg-ink-800
+           transition-all duration-150 cursor-pointer;
+  }
+  .nav-item.active {
+    @apply bg-ink-800 text-white;
+  }
+
+  /* Modal overlay */
+  .modal-overlay {
+    @apply fixed inset-0 z-50 flex items-center justify-center p-4;
+    background: rgba(10, 10, 8, 0.6);
+    backdrop-filter: blur(4px);
+  }
+
+  .modal-box {
+    @apply card w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 animate-slide-up;
+  }
+
+  /* Section heading */
+  .section-title {
+    @apply font-display text-2xl text-ink-900;
+  }
+
+  /* Stat card */
+  .stat-card {
+    @apply card p-5 flex flex-col gap-1;
+  }
+}
