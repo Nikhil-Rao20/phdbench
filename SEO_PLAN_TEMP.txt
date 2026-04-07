@@ -1,0 +1,45 @@
+PhDBench SEO + Analytics Temporary Plan
+
+Goal
+- Improve discoverability for branded and relevant non-branded search terms.
+- Add GA4 tracking without affecting app data integrity.
+- Keep Firestore data untouched.
+
+Phase 1: Technical SEO Foundation
+1. Add strong default metadata in index.html:
+   - title, description, keywords, robots, author, theme-color
+   - Open Graph + Twitter tags
+   - canonical link
+2. Add structured data (JSON-LD): WebSite + SoftwareApplication
+3. Add public/robots.txt and public/sitemap.xml
+
+Phase 2: In-App SEO Manager
+1. Add route-based SEO manager:
+   - Per-route title/description updates
+   - Canonical + OG URL sync with route
+   - Dynamic structured data (WebPage)
+2. Keep updates frontend-only; no DB writes.
+
+Phase 3: Google Analytics (GA4)
+1. Add GA helper module with:
+   - initAnalytics()
+   - trackPageView()
+   - trackEvent()
+2. Initialize GA from VITE_GA_MEASUREMENT_ID
+3. Auto-track SPA page views on route changes
+4. Do not track user PII
+
+Phase 4: Verification + Guidance
+1. Build validation
+2. Provide setup checklist for:
+   - GA4 property + Measurement ID
+   - Search Console + sitemap submit
+   - GitHub Pages indexing checks
+
+Safety Constraints
+- No Firestore schema changes
+- No mutation of application/leads/documents data
+- SEO/analytics limited to metadata and telemetry only
+
+Temporary Note
+- This file is temporary and will be deleted after final SEO setup review.

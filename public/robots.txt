@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://nikhil-rao20.github.io/phdbench/sitemap.xml
