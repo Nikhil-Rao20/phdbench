@@ -86,6 +86,7 @@ function Sidebar({ onClose }) {
 
 export default function Layout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const location = useLocation()
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: '#f6f5f0' }}>
@@ -131,9 +132,18 @@ export default function Layout({ children }) {
           </div>
         </div>
 
-        <div className="p-6 lg:p-8 max-w-6xl mx-auto">
-          {children}
-        </div>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.35, ease: 'easeOut' }}
+            className="p-6 lg:p-8 max-w-6xl mx-auto"
+          >
+            {children}
+          </motion.div>
+        </AnimatePresence>
       </main>
     </div>
   )
