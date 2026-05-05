@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { ExternalLink, CheckSquare, Square } from 'lucide-react'
 import { getDocuments } from '../lib/db'
 
-const AREAS    = ['Computer Vision', 'NLP / LLM', 'Medical Imaging', 'Robotics', 'ML Theory', 'Multimodal AI', 'Reinforcement Learning', 'Other']
+const AREAS    = ['Computer Vision', 'Medical Imaging', 'Multimodal AI', 'Reinforcement Learning', 'Computational Biology', 'Other']
 const STATUSES = ['applied', 'emailed', 'interview', 'offer', 'rejected']
 
 function Checkbox({ checked, onChange, label }) {
@@ -42,6 +42,7 @@ export default function ApplicationForm({ initial = {}, uid = null, onSubmit, on
     applicationType:  initial.applicationType  || 'portal',
     appUrl:           initial.appUrl           || '',
     status:           initial.status           || 'applied',
+    startDate:        initial.startDate        || '',
     deadline:         initial.deadline         || '',
     lorDeadline:      initial.lorDeadline      || '',
     expectedDecision: initial.expectedDecision || '',
@@ -50,8 +51,9 @@ export default function ApplicationForm({ initial = {}, uid = null, onSubmit, on
     emailSubject:     initial.emailSubject     || '',
     emailReplied:     initial.emailReplied     || false,
     // Docs — which are required and which are submitted
-    requiredDocs: initial.requiredDocs || [],
-    submittedDocs: initial.submittedDocs || initial.docs || {},
+    requiredDocs:     initial.requiredDocs     || [],
+    submittedDocs:    initial.submittedDocs    || initial.docs || {},
+    driveLink:        initial.driveLink        || '',
     // Notes
     whyThisLab:       initial.whyThisLab       || '',
     sopAngle:         initial.sopAngle         || '',
@@ -234,7 +236,12 @@ export default function ApplicationForm({ initial = {}, uid = null, onSubmit, on
         <h3 className="text-xs font-semibold text-ink-400 uppercase tracking-widest mb-3 pb-2 border-b border-ink-100">
           Deadlines
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
+            <label className="label">Opens On</label>
+            <input className="input" type="date" value={form.startDate}
+              onChange={e => set('startDate', e.target.value)} />
+          </div>
           <div>
             <label className="label">Application deadline</label>
             <input className="input" type="date" value={form.deadline}
@@ -271,6 +278,23 @@ export default function ApplicationForm({ initial = {}, uid = null, onSubmit, on
           </p>
         ) : (
           <>
+            {/* Drive Link */}
+            <div className="mb-6">
+              <label className="label">Google Drive Folder URL</label>
+              <div className="relative">
+                <input className="input pr-9" value={form.driveLink}
+                  onChange={e => set('driveLink', e.target.value)} 
+                  placeholder="https://drive.google.com/drive/folders/…" />
+                {form.driveLink && (
+                  <a href={form.driveLink} target="_blank" rel="noreferrer"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-sage-600">
+                    <ExternalLink size={14} />
+                  </a>
+                )}
+              </div>
+              <p className="text-xs text-ink-400 mt-1">Link to the folder containing your tailored SOP, CV, and other documents for this application.</p>
+            </div>
+
             {/* Step 1: Select required documents */}
             <div className="mb-6">
               <label className="label">Which documents does this application require?</label>

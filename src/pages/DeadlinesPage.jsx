@@ -1,13 +1,20 @@
 // src/pages/DeadlinesPage.jsx
 import { useEffect, useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
-import { getApplications } from '../lib/db'
+import { getApplications, getLeads } from '../lib/db'
 import { motion } from 'framer-motion'
 import { CalendarClock, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { differenceInDays, isPast, format } from 'date-fns'
 import StatusBadge from '../components/StatusBadge'
 
-function urgencyLevel(days) {
+function urgencyLevel(days, type) {
+  if (type === 'Application Opens') {
+    if (days < 0) return { label: 'Opened', color: 'bg-sage-50 border-sage-200', dot: 'bg-sage-500', bar: 'bg-sage-400' }
+    if (days <= 7) return { label: '🟢 Opens soon', color: 'bg-sky-50 border-sky-200', dot: 'bg-sky-500 animate-pulse', bar: 'bg-sky-500' }
+    if (days <= 30) return { label: '🔵 Upcoming', color: 'bg-slate-50 border-slate-200', dot: 'bg-slate-400', bar: 'bg-slate-400' }
+    return { label: '⚪ Future', color: 'bg-ink-50 border-ink-200', dot: 'bg-ink-300', bar: 'bg-ink-300' }
+  }
+
   if (days < 0)  return { label: 'Overdue',  color: 'bg-ink-200 text-ink-500', dot: 'bg-ink-400', bar: 'bg-ink-300' }
   if (days <= 7)  return { label: '🔴 Critical', color: 'bg-rose-50 border-rose-200', dot: 'bg-rose-500 animate-pulse', bar: 'bg-rose-500' }
   if (days <= 14) return { label: '🟠 Urgent',   color: 'bg-amber-50 border-amber-200', dot: 'bg-amber-500', bar: 'bg-amber-400' }
@@ -18,7 +25,7 @@ function urgencyLevel(days) {
 function DeadlineRow({ app, deadlineType, date, index }) {
   const d    = new Date(date)
   const days = differenceInDays(d, new Date())
-  const urg  = urgencyLevel(days)
+  const urg  = urgencyLevel(days, deadlineType)
   const past = isPast(d)
 
   return (
@@ -26,7 +33,7 @@ function DeadlineRow({ app, deadlineType, date, index }) {
       initial={{ opacity: 0, x: -12 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.05 }}
-      className={`card p-4 border flex items-center gap-4 ${urg.color} ${past ? 'opacity-50' : ''}`}
+      className={`card p-4 border flex items-center gap-4 ${urg.color} ${past && deadlineType !== 'Application Opens' ? 'opacity-50' : ''}`}
     >
       <div className={`w-3 h-3 rounded-full shrink-0 ${urg.dot}`} />
 
@@ -42,11 +49,15 @@ function DeadlineRow({ app, deadlineType, date, index }) {
 
       <div className="text-right shrink-0">
         <div className={`text-sm font-medium ${
-          days < 0 ? 'text-ink-400 line-through' :
-          days <= 7 ? 'text-rose-700' :
-          days <= 14 ? 'text-amber-700' : 'text-ink-700'
+          days < 0 
+            ? (deadlineType === 'Application Opens' ? 'text-sage-600' : 'text-ink-400 line-through') 
+            : days <= 7 
+              ? (deadlineType === 'Application Opens' ? 'text-sky-600' : 'text-rose-700')
+              : days <= 14 
+                ? (deadlineType === 'Application Opens' ? 'text-slate-600' : 'text-amber-700')
+                : 'text-ink-700'
         }`}>
-          {past ? 'Passed' : days === 0 ? 'TODAY' : `${days} days`}
+          {past ? (deadlineType === 'Application Opens' ? 'OPENED' : 'Passed') : days === 0 ? 'TODAY' : `${days} days`}
         </div>
         <div className="text-xs text-ink-400">{format(d, 'MMM d, yyyy')}</div>
       </div>
@@ -59,17 +70,23 @@ function DeadlineRow({ app, deadlineType, date, index }) {
 export default function DeadlinesPage() {
   const { user }   = useAuth()
   const [apps, setApps]     = useState([])
+  const [leads, setLeads]   = useState([])
   const [loading, setLoading] = useState(true)
   const [showPast, setShowPast] = useState(false)
 
   useEffect(() => {
     if (!user) return
-    getApplications(user.uid).then(setApps).finally(() => setLoading(false))
+    Promise.all([getApplications(user.uid), getLeads(user.uid)])
+      .then(([a, l]) => { setApps(a); setLeads(l) })
+      .finally(() => setLoading(false))
   }, [user])
 
-  // Collect all deadline entries
+  // Collect all deadline entries from both apps and non-converted leads
   const entries = []
-  apps.forEach(app => {
+  const allItems = [...apps, ...leads.filter(l => l.status !== 'converted')]
+  
+  allItems.forEach(app => {
+    if (app.startDate)       entries.push({ app, deadlineType: 'Application Opens',    date: app.startDate })
     if (app.deadline)        entries.push({ app, deadlineType: 'Application deadline', date: app.deadline })
     if (app.lorDeadline)     entries.push({ app, deadlineType: 'LOR request',          date: app.lorDeadline })
     if (app.expectedDecision) entries.push({ app, deadlineType: 'Decision expected',   date: app.expectedDecision })

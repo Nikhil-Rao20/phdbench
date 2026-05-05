@@ -10,17 +10,17 @@ import StatusBadge from '../components/StatusBadge'
 import { Plus, FileText, Search, ExternalLink, Pencil, Trash2, CheckSquare, Square } from 'lucide-react'
 import { differenceInDays, isPast } from 'date-fns'
 
-const STATUSES   = ['All', 'applied', 'emailed', 'interview', 'offer', 'rejected']
-const APP_TYPES  = ['All', 'portal', 'email', 'both']
+const STATUSES = ['All', 'applied', 'emailed', 'interview', 'offer', 'rejected']
+const APP_TYPES = ['All', 'portal', 'email', 'both']
 
 function DocsBar({ app, documents }) {
   const requiredDocsForApp = app.requiredDocs || []
   const required = requiredDocsForApp.length
   if (required === 0) return <span className="text-xs text-ink-400">No required docs</span>
-  const done  = Object.entries(app.submittedDocs || app.docs || {})
+  const done = Object.entries(app.submittedDocs || app.docs || {})
     .filter(([docId, submitted]) => submitted && requiredDocsForApp.includes(docId))
     .length
-  const pct   = Math.round((done / required) * 100)
+  const pct = Math.round((done / required) * 100)
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 h-1.5 bg-ink-100 rounded-full overflow-hidden">
@@ -36,9 +36,9 @@ function DocsBar({ app, documents }) {
 
 function DeadlinePill({ date }) {
   if (!date) return null
-  const d     = new Date(date)
-  const days  = differenceInDays(d, new Date())
-  const past  = isPast(d)
+  const d = new Date(date)
+  const days = differenceInDays(d, new Date())
+  const past = isPast(d)
   if (past) return <span className="text-xs text-ink-400 line-through">{date}</span>
   return (
     <span className={`text-xs font-medium ${days <= 7 ? 'text-rose-600' : days <= 21 ? 'text-amber-600' : 'text-ink-500'}`}>
@@ -47,20 +47,33 @@ function DeadlinePill({ date }) {
   )
 }
 
+function OpensPill({ date }) {
+  if (!date) return null
+  const d = new Date(date)
+  const days = differenceInDays(d, new Date())
+  const past = isPast(d)
+  if (past) return <span className="text-xs text-sage-600">Opened: {date}</span>
+  return (
+    <span className={`text-xs font-medium text-sky-600`}>
+      {days === 0 ? 'Opens Today!' : `Opens in ${days}d`}
+    </span>
+  )
+}
+
 export default function ApplicationsPage() {
-  const { user }    = useAuth()
-  const [apps, setApps]           = useState([])
+  const { user } = useAuth()
+  const [apps, setApps] = useState([])
   const [documents, setDocuments] = useState([])
-  const [loading, setLoading]     = useState(true)
-  const [saving, setSaving]       = useState(false)
-  const [addOpen, setAddOpen]     = useState(false)
-  const [editTarget, setEditTarget]     = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState(null)
   const [detailTarget, setDetailTarget] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
-  const [search, setSearch]       = useState('')
-  const [statusF, setStatusF]     = useState('All')
-  const [typeF, setTypeF]         = useState('All')
-  const [view, setView]           = useState('cards') // cards | table
+  const [search, setSearch] = useState('')
+  const [statusF, setStatusF] = useState('All')
+  const [typeF, setTypeF] = useState('All')
+  const [view, setView] = useState('cards') // cards | table
 
   const reload = async () => {
     const [app_data, doc_data] = await Promise.all([
@@ -103,7 +116,7 @@ export default function ApplicationsPage() {
 
   const filtered = apps
     .filter(a => statusF === 'All' || a.status === statusF)
-    .filter(a => typeF   === 'All' || a.applicationType === typeF)
+    .filter(a => typeF === 'All' || a.applicationType === typeF)
     .filter(a => {
       const q = search.toLowerCase()
       return !q || [a.university, a.labName, a.professor, a.researchArea]
@@ -133,18 +146,16 @@ export default function ApplicationsPage() {
         <div className="flex gap-2 flex-wrap">
           {STATUSES.map(s => (
             <button key={s} onClick={() => setStatusF(s)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
-                statusF === s ? 'bg-ink-900 text-white' : 'bg-white border border-ink-200 text-ink-600 hover:bg-ink-50'
-              }`}>
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${statusF === s ? 'bg-ink-900 text-white' : 'bg-white border border-ink-200 text-ink-600 hover:bg-ink-50'
+                }`}>
               {s.charAt(0).toUpperCase() + s.slice(1)}
             </button>
           ))}
           <div className="w-px bg-ink-200 mx-1 self-stretch" />
           {APP_TYPES.map(t => (
             <button key={t} onClick={() => setTypeF(t)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
-                typeF === t ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-white border border-ink-200 text-ink-600 hover:bg-ink-50'
-              }`}>
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${typeF === t ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-white border border-ink-200 text-ink-600 hover:bg-ink-50'
+                }`}>
               {t === 'All' ? 'All types' : t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
           ))}
@@ -181,9 +192,8 @@ export default function ApplicationsPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96 }}
               transition={{ delay: i * 0.04 }}
-              className={`card p-5 flex flex-col gap-3 cursor-pointer hover:shadow-md transition-shadow ${
-                detailTarget?.id === app.id ? 'ring-2 ring-ink-900' : ''
-              } ${app.status === 'offer' ? 'border-sage-300 bg-sage-50/40' : ''}
+              className={`card p-5 flex flex-col gap-3 cursor-pointer hover:shadow-md transition-shadow ${detailTarget?.id === app.id ? 'ring-2 ring-ink-900' : ''
+                } ${app.status === 'offer' ? 'border-sage-300 bg-sage-50/40' : ''}
                 ${app.status === 'rejected' ? 'opacity-60' : ''}`}
               onClick={() => setDetailTarget(app)}
             >
@@ -206,7 +216,13 @@ export default function ApplicationsPage() {
               {/* Docs bar */}
               <DocsBar app={app} documents={documents} />
 
-              {/* Deadline */}
+              {/* Deadlines & Dates */}
+              {app.startDate && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-ink-400">Opens On</span>
+                  <OpensPill date={app.startDate} />
+                </div>
+              )}
               {app.deadline && (
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-ink-400">Deadline</span>
@@ -220,6 +236,11 @@ export default function ApplicationsPage() {
                 {app.appUrl && (
                   <a href={app.appUrl} target="_blank" rel="noreferrer" className="btn-ghost py-1 px-2 text-xs">
                     <ExternalLink size={12} /> Portal
+                  </a>
+                )}
+                {app.driveLink && (
+                  <a href={app.driveLink} target="_blank" rel="noreferrer" className="btn-ghost py-1 px-2 text-xs text-sky-600 hover:bg-sky-50">
+                    <ExternalLink size={12} /> Documents
                   </a>
                 )}
                 <div className="flex-1" />

@@ -8,9 +8,8 @@ import { format } from 'date-fns'
 
 function DocsPill({ done, label }) {
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs ${
-      done ? 'bg-sage-100 text-sage-700' : 'bg-ink-100 text-ink-400 line-through'
-    }`}>
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs ${done ? 'bg-sage-100 text-sage-700' : 'bg-ink-100 text-ink-400 line-through'
+      }`}>
       {done ? <CheckSquare size={10} /> : <Square size={10} />}
       {label}
     </span>
@@ -19,12 +18,12 @@ function DocsPill({ done, label }) {
 
 export default function ApplicationDetailPanel({ app, uid, onClose, onEdit }) {
   const [followups, setFollowups] = useState([])
-  const [activity, setActivity]   = useState([])
+  const [activity, setActivity] = useState([])
   const [documents, setDocuments] = useState([])
-  const [fuText, setFuText]       = useState('')
-  const [fuDate, setFuDate]       = useState('')
-  const [actNote, setActNote]     = useState('')
-  const [tab, setTab]             = useState('overview') // overview | followups | log
+  const [fuText, setFuText] = useState('')
+  const [fuDate, setFuDate] = useState('')
+  const [actNote, setActNote] = useState('')
+  const [tab, setTab] = useState('overview') // overview | followups | log
 
   useEffect(() => {
     if (!app) return
@@ -55,8 +54,8 @@ export default function ApplicationDetailPanel({ app, uid, onClose, onEdit }) {
   }
 
   const requiredDocList = documents.filter(doc => (app.requiredDocs || []).includes(doc.id))
-  const docsReady   = requiredDocList.filter(doc => app.submittedDocs?.[doc.id] || app.docs?.[doc.id]).length
-  const docsTotal   = requiredDocList.length
+  const docsReady = requiredDocList.filter(doc => app.submittedDocs?.[doc.id] || app.docs?.[doc.id]).length
+  const docsTotal = requiredDocList.length
 
   return (
     <AnimatePresence>
@@ -89,18 +88,17 @@ export default function ApplicationDetailPanel({ app, uid, onClose, onEdit }) {
             {/* Tabs */}
             <div className="flex border-b border-ink-100 px-5">
               {[
-                { id: 'overview',  label: 'Overview',   icon: FileText },
+                { id: 'overview', label: 'Overview', icon: FileText },
                 { id: 'followups', label: `Follow-ups (${followups.length})`, icon: MessageSquare },
-                { id: 'log',       label: 'Activity log', icon: Clock },
+                { id: 'log', label: 'Activity log', icon: Clock },
               ].map(t => (
                 <button
                   key={t.id}
                   onClick={() => setTab(t.id)}
-                  className={`flex items-center gap-1.5 py-3 px-3 text-xs font-medium border-b-2 transition-colors ${
-                    tab === t.id
-                      ? 'border-ink-900 text-ink-900'
-                      : 'border-transparent text-ink-400 hover:text-ink-700'
-                  }`}
+                  className={`flex items-center gap-1.5 py-3 px-3 text-xs font-medium border-b-2 transition-colors ${tab === t.id
+                    ? 'border-ink-900 text-ink-900'
+                    : 'border-transparent text-ink-400 hover:text-ink-700'
+                    }`}
                 >
                   <t.icon size={13} />
                   {t.label}
@@ -134,15 +132,21 @@ export default function ApplicationDetailPanel({ app, uid, onClose, onEdit }) {
                         <ExternalLink size={11} /> Apply portal
                       </a>
                     )}
+                    {app.driveLink && (
+                      <a href={app.driveLink} target="_blank" rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-sky-200 text-sky-700 hover:bg-sky-50">
+                        <ExternalLink size={11} /> Docs Folder
+                      </a>
+                    )}
                   </div>
 
                   {/* Details grid */}
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     {[
-                      { label: 'Type',         value: app.applicationType || '—' },
-                      { label: 'Research area', value: app.researchArea    || '—' },
-                      { label: 'Department',    value: app.department       || '—' },
-                      { label: 'Funding',       value: app.fundingNote      || '—' },
+                      { label: 'Type', value: app.applicationType || '—' },
+                      { label: 'Research area', value: app.researchArea || '—' },
+                      { label: 'Department', value: app.department || '—' },
+                      { label: 'Funding', value: app.fundingNote || '—' },
                     ].map(r => (
                       <div key={r.label} className="bg-ink-50 rounded-xl p-3">
                         <div className="text-xs text-ink-400 mb-0.5">{r.label}</div>
@@ -155,8 +159,8 @@ export default function ApplicationDetailPanel({ app, uid, onClose, onEdit }) {
                   <div className="space-y-2">
                     <div className="text-xs font-medium text-ink-500 uppercase tracking-wider">Deadlines</div>
                     {[
-                      { label: 'Application',    v: app.deadline },
-                      { label: 'LOR request',    v: app.lorDeadline },
+                      { label: 'Application', v: app.deadline },
+                      { label: 'LOR request', v: app.lorDeadline },
                       { label: 'Decision expected', v: app.expectedDecision },
                     ].map(d => d.v && (
                       <div key={d.label} className="flex items-center justify-between text-sm">

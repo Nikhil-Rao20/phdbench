@@ -55,12 +55,23 @@ export default function Dashboard() {
       .finally(() => setLoading(false))
   }, [user])
 
-  // Upcoming deadlines (within 30 days, not past)
-  const upcoming = apps
+  // Combine apps and active leads to show dates for both
+  const allItems = [...apps, ...leads.filter(l => l.status !== 'converted')]
+
+  // Upcoming deadlines
+  const upcoming = allItems
     .filter(a => a.deadline)
     .map(a => ({ ...a, deadlineDate: new Date(a.deadline) }))
     .filter(a => !isPast(a.deadlineDate))
     .sort((a, b) => a.deadlineDate - b.deadlineDate)
+    .slice(0, 5)
+
+  // Upcoming Openings
+  const upcomingOpenings = allItems
+    .filter(a => a.startDate)
+    .map(a => ({ ...a, startDateDate: new Date(a.startDate) }))
+    .filter(a => !isPast(a.startDateDate))
+    .sort((a, b) => a.startDateDate - b.startDateDate)
     .slice(0, 5)
 
   // Recent applications
@@ -103,12 +114,12 @@ export default function Dashboard() {
         {stats.map((s, i) => <StatCard key={s.label} {...s} delay={i * 0.07} />)}
       </div>
 
-      <div className="grid lg:grid-cols-5 gap-6">
+      <div className="grid lg:grid-cols-3 gap-6">
         {/* Upcoming deadlines */}
         <motion.div
           initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.4 }}
-          className="lg:col-span-2 card p-5"
+          className="card p-5"
         >
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-display text-lg text-ink-900">Upcoming deadlines</h2>
@@ -142,11 +153,49 @@ export default function Dashboard() {
           )}
         </motion.div>
 
+        {/* Upcoming openings */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35, duration: 0.4 }}
+          className="card p-5"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display text-lg text-ink-900">Upcoming openings</h2>
+            <Link to="/deadlines" className="text-xs text-sage-600 hover:underline">View all</Link>
+          </div>
+
+          {upcomingOpenings.length === 0 ? (
+            <div className="text-center py-8 text-ink-400 text-sm">
+              <CalendarClock size={28} className="mx-auto mb-2 text-ink-300" />
+              No upcoming openings
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {upcomingOpenings.map(app => {
+                const days = differenceInDays(app.startDateDate, new Date())
+                const urgent = days <= 7
+                return (
+                  <div key={app.id} className="flex items-start gap-3 p-3 rounded-xl bg-ink-50 hover:bg-ink-100 transition-colors">
+                    <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${urgent ? 'bg-sky-500 animate-pulse-soft' : 'bg-sky-300'}`} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-ink-800 truncate">{app.university}</div>
+                      <div className="text-xs text-ink-500 truncate">{app.labName || app.professor}</div>
+                    </div>
+                    <div className={`text-xs font-medium shrink-0 ${urgent ? 'text-sky-600' : 'text-sky-500'}`}>
+                      {days === 0 ? 'Today!' : `${days}d`}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </motion.div>
+
         {/* Recent applications */}
         <motion.div
           initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4, duration: 0.4 }}
-          className="lg:col-span-3 card p-5"
+          className="card p-5"
         >
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-display text-lg text-ink-900">Recent applications</h2>

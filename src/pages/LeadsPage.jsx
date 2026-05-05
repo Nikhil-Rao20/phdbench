@@ -10,9 +10,35 @@ import {
   Plus, Lightbulb, ExternalLink, Pencil, Trash2,
   ArrowUpRight, Search, Filter, StickyNote
 } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
+import { formatDistanceToNow, differenceInDays, isPast } from 'date-fns'
 
 const FILTERS = ['All', 'lead', 'converted']
+
+function DeadlinePill({ date }) {
+  if (!date) return null
+  const d     = new Date(date)
+  const days  = differenceInDays(d, new Date())
+  const past  = isPast(d)
+  if (past) return <span className="text-ink-400 line-through">Deadline: {date}</span>
+  return (
+    <span className={`${days <= 7 ? 'text-rose-600' : days <= 21 ? 'text-amber-600' : 'text-ink-500'}`}>
+      {days === 0 ? '⚠️ Deadline Today!' : days <= 7 ? `⚠️ Deadline in ${days}d` : `Deadline in ${days}d`}
+    </span>
+  )
+}
+
+function OpensPill({ date }) {
+  if (!date) return null
+  const d = new Date(date)
+  const days = differenceInDays(d, new Date())
+  const past = isPast(d)
+  if (past) return <span className="text-sage-600">Opened: {date}</span>
+  return (
+    <span className="text-sky-600 font-medium">
+      {days === 0 ? 'Opens Today!' : `Opens in ${days}d`}
+    </span>
+  )
+}
 
 export default function LeadsPage() {
   const { user } = useAuth()
@@ -156,9 +182,19 @@ export default function LeadsPage() {
               </div>
 
               {/* Professor & area */}
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-600">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-600">
                 <span>👤 {lead.professor}</span>
                 {lead.researchArea && <span>🔬 {lead.researchArea}</span>}
+                {lead.startDate && (
+                  <span className="flex items-center gap-1">
+                    🟢 <OpensPill date={lead.startDate} />
+                  </span>
+                )}
+                {lead.deadline && (
+                  <span className="flex items-center gap-1">
+                    📅 <DeadlinePill date={lead.deadline} />
+                  </span>
+                )}
               </div>
 
               {/* Notes preview */}
@@ -268,13 +304,14 @@ export default function LeadsPage() {
 // Mini form for promoting a lead to application
 function PromoteForm({ lead, onSubmit, onCancel, loading }) {
   const [type, setType]         = useState('portal')
-  const [deadline, setDeadline] = useState('')
+  const [startDate, setStartDate] = useState(lead.startDate || '')
+  const [deadline, setDeadline] = useState(lead.deadline || '')
   const [appUrl, setAppUrl]     = useState('')
   const [notes, setNotes]       = useState('')
 
   const handleSubmit = e => {
     e.preventDefault()
-    onSubmit({ applicationType: type, deadline, appUrl, promotionNotes: notes })
+    onSubmit({ applicationType: type, startDate, deadline, appUrl, promotionNotes: notes })
   }
 
   return (
@@ -307,7 +344,12 @@ function PromoteForm({ lead, onSubmit, onCancel, loading }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <label className="label">Opens On</label>
+          <input className="input" type="date" value={startDate}
+            onChange={e => setStartDate(e.target.value)} />
+        </div>
         <div>
           <label className="label">Application deadline</label>
           <input className="input" type="date" value={deadline}

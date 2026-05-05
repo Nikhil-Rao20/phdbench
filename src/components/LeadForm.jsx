@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { ExternalLink } from 'lucide-react'
 
 const SOURCES = ['LinkedIn', 'Twitter/X', 'Lab website', 'Email list', 'Conference', 'Friend/Referral', 'Other']
-const AREAS   = ['Computer Vision', 'NLP / LLM', 'Medical Imaging', 'Robotics', 'ML Theory', 'Multimodal AI', 'Reinforcement Learning', 'Other']
+const AREAS   = ['Computer Vision', 'Medical Imaging', 'Multimodal AI', 'Reinforcement Learning', 'Computational Biology', 'Other']
 
 export default function LeadForm({ initial = {}, onSubmit, onCancel, loading }) {
   const [form, setForm] = useState({
@@ -14,6 +14,8 @@ export default function LeadForm({ initial = {}, onSubmit, onCancel, loading }) 
     linkedinPost: initial.linkedinPost || '',
     source:       initial.source       || 'LinkedIn',
     researchArea: initial.researchArea || '',
+    startDate:    initial.startDate    || '',
+    deadline:     initial.deadline     || '',
     notes:        initial.notes        || '',
     fundingNote:  initial.fundingNote  || '',
   })
@@ -90,10 +92,20 @@ export default function LeadForm({ initial = {}, onSubmit, onCancel, loading }) 
           </select>
         </div>
         <div>
-          <label className="label">Funding / Stipend note</label>
+          <label className="label">Funding / Stipend</label>
           <input className="input" value={form.fundingNote}
             onChange={e => set('fundingNote', e.target.value)}
-            placeholder="RA/TA/Fellowship available…" />
+            placeholder="RA/TA/Fellowship…" />
+        </div>
+        <div>
+          <label className="label">Opens On</label>
+          <input className="input" type="date" value={form.startDate}
+            onChange={e => set('startDate', e.target.value)} />
+        </div>
+        <div>
+          <label className="label">Deadline</label>
+          <input className="input" type="date" value={form.deadline}
+            onChange={e => set('deadline', e.target.value)} />
         </div>
       </div>
 
