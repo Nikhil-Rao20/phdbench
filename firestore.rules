@@ -1,0 +1,84 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PhDBench — single-owner Firestore security rules
+//
+// ⚠️  BEFORE PUBLISHING: confirm OWNER_EMAIL below is the exact Google account
+//     you sign in with. Publishing with the wrong address locks you out of
+//     your own data. See docs/FIREBASE.md for how to publish these.
+//
+// Model: every document lives under /users/{uid}/... and only the owner's
+// authenticated, email-verified account may touch its own subtree. Anyone else
+// who signs in is denied at the rules layer, not merely hidden in the UI.
+// ─────────────────────────────────────────────────────────────────────────────
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function ownerEmail() {
+      return 'nikhil01446@gmail.com';
+    }
+
+    function isOwner() {
+      return request.auth != null
+          && request.auth.token.email != null
+          && request.auth.token.email_verified == true
+          && request.auth.token.email.lower() == ownerEmail();
+    }
+
+    // Owner, and operating inside their own namespace.
+    function ownsNamespace(userId) {
+      return isOwner() && request.auth.uid == userId;
+    }
+
+    // Guard against a runaway client writing unbounded documents.
+    // Firestore caps a document at 1 MiB; these are far tighter sanity limits.
+    function withinSizeLimits() {
+      return request.resource.data.size() <= 80;
+    }
+
+    match /users/{userId} {
+      allow read, write: if ownsNamespace(userId);
+
+      // Applications and everything nested beneath them
+      // (followups, activity, recommenders, …).
+      match /applications/{appId} {
+        allow read, delete: if ownsNamespace(userId);
+        allow create, update: if ownsNamespace(userId) && withinSizeLimits();
+
+        match /{subCollection}/{docId} {
+          allow read, delete: if ownsNamespace(userId);
+          allow create, update: if ownsNamespace(userId) && withinSizeLimits();
+        }
+      }
+
+      match /leads/{leadId} {
+        allow read, delete: if ownsNamespace(userId);
+        allow create, update: if ownsNamespace(userId) && withinSizeLimits();
+      }
+
+      match /documents/{documentId} {
+        allow read, delete: if ownsNamespace(userId);
+        allow create, update: if ownsNamespace(userId) && withinSizeLimits();
+      }
+
+      // Profile: name, accent colour, test scores, credential evaluations,
+      // recommenders, email templates, onboarding state.
+      match /profile/{profileDoc} {
+        allow read, delete: if ownsNamespace(userId);
+        allow create, update: if ownsNamespace(userId) && withinSizeLimits();
+      }
+
+      // Any future collection under the owner's namespace stays owner-only
+      // rather than silently defaulting open.
+      match /{collection}/{docId=**} {
+        allow read, write: if ownsNamespace(userId);
+      }
+    }
+
+    // Everything outside /users is denied. No implicit public surface.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
