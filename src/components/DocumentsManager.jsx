@@ -1,172 +1,184 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Trash2, GripVertical, Edit2, Check, X } from 'lucide-react'
-import { getDocuments, addDocument, updateDocument, deleteDocument } from '../lib/db'
+import { Plus, Trash2, Edit2, Check, X, ArrowUp, ArrowDown } from 'lucide-react'
+import { useData, useUid } from '../hooks/useData'
+import { useToast, useMutation } from '../hooks/useToast'
+import { addDocument, updateDocument, deleteDocument, reorderDocuments } from '../lib/db'
+import { Button, Tooltip, cn } from './ui'
+import { Input } from './form'
 
-export default function DocumentsManager({ uid }) {
-  const [documents, setDocuments] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [newDocName, setNewDocName] = useState('')
+export default function DocumentsManager() {
+  const uid = useUid()
+  const { documents } = useData()
+  const toast = useToast()
+  const mutate = useMutation()
+
+  const [newName, setNewName] = useState('')
   const [editingId, setEditingId] = useState(null)
   const [editingName, setEditingName] = useState('')
-  const [error, setError] = useState(null)
-
-  const loadDocuments = async () => {
-    setLoading(true)
-    try {
-      const docs = await getDocuments(uid)
-      setDocuments(docs)
-      setError(null)
-    } catch (e) {
-      setError(e.message)
-    }
-    setLoading(false)
-  }
-
-  useEffect(() => {
-    if (uid) loadDocuments()
-  }, [uid])
 
   const handleAdd = async () => {
-    if (!newDocName.trim()) return
-    try {
-      await addDocument(uid, { name: newDocName })
-      setNewDocName('')
-      await loadDocuments()
-    } catch (e) {
-      setError(e.message)
-    }
+    const name = newName.trim()
+    if (!name) return
+    const r = await mutate(() => addDocument(uid, { name }), {
+      success: `Added “${name}”.`,
+      failure: 'Could not add that document type.',
+    })
+    if (r.ok) setNewName('')
   }
 
   const handleUpdate = async (id) => {
-    if (!editingName.trim()) return
-    try {
-      await updateDocument(uid, id, { name: editingName })
-      setEditingId(null)
-      await loadDocuments()
-    } catch (e) {
-      setError(e.message)
-    }
+    const name = editingName.trim()
+    if (!name) return
+    const r = await mutate(() => updateDocument(uid, id, { name }), {
+      failure: 'Could not rename that document.',
+    })
+    if (r.ok) setEditingId(null)
   }
 
-  const handleDelete = async (id) => {
-    try {
-      await deleteDocument(uid, id)
-      await loadDocuments()
-    } catch (e) {
-      setError(e.message)
-    }
+  /**
+   * Deleting a document type also strips its id from every application, so a
+   * progress bar can never end up counting a document that no longer exists.
+   * The count of affected applications is reported, because silently rewriting
+   * records is exactly the kind of thing a user should be told about.
+   */
+  const handleDelete = async (doc) => {
+    const r = await mutate(() => deleteDocument(uid, doc.id), {
+      failure: 'Could not delete that document type.',
+    })
+    if (!r.ok) return
+    const affected = r.data
+    toast.success(
+      affected > 0
+        ? `“${doc.name}” removed, and cleared from ${affected} application${affected === 1 ? '' : 's'}.`
+        : `“${doc.name}” removed.`,
+    )
+  }
+
+  const move = (index, direction) => {
+    const next = [...documents]
+    const target = index + direction
+    if (target < 0 || target >= next.length) return
+    ;[next[index], next[target]] = [next[target], next[index]]
+    mutate(() => reorderDocuments(uid, next.map(d => d.id)), {
+      failure: 'Could not reorder your documents.',
+    })
   }
 
   return (
     <div className="space-y-5">
-      <div>
-        <h3 className="text-sm font-semibold text-ink-600 uppercase tracking-wider mb-3">
-          Your Documents
-        </h3>
-        <p className="text-xs text-ink-400 mb-4">
-          Define the documents you typically submit. These will appear as checkboxes when adding applications.
-        </p>
-      </div>
+      <p className="text-sm text-ink-500 leading-relaxed max-w-prose">
+        The documents you submit. These become the checklist on every application,
+        so you can mark which ones each university requires and which you have sent.
+      </p>
 
-      {error && (
-        <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm">
-          {error}
-        </div>
-      )}
-
-      {/* Add new document */}
       <div className="flex gap-2">
-        <input
-          type="text"
-          className="input"
-          placeholder="Add a new document type (e.g., 'Portfolio', 'GitHub')"
-          value={newDocName}
-          onChange={e => setNewDocName(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleAdd()}
+        <Input
+          placeholder="Add a document type — Portfolio, GitHub, Research proposal…"
+          value={newName}
+          onChange={e => setNewName(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAdd() } }}
+          aria-label="New document name"
         />
-        <button
-          className="btn-primary shrink-0"
-          onClick={handleAdd}
-          disabled={!newDocName.trim()}
+        <Button
+          variant="primary" icon={Plus} onClick={handleAdd}
+          disabled={!newName.trim()} disabledReason="Type a name first."
         >
-          <Plus size={16} />
-        </button>
+          Add
+        </Button>
       </div>
 
-      {/* List */}
-      {loading ? (
-        <div className="flex items-center justify-center h-20">
-          <div className="w-5 h-5 border-2 border-ink-200 border-t-ink-800 rounded-full animate-spin" />
-        </div>
-      ) : documents.length === 0 ? (
-        <p className="text-center text-ink-400 text-sm py-6">No documents yet. Add one to get started.</p>
+      {documents.length === 0 ? (
+        <p className="text-center text-ink-400 text-sm py-8">
+          Setting up your default checklist…
+        </p>
       ) : (
-        <div className="space-y-2">
-          <AnimatePresence>
+        <ul className="space-y-2">
+          <AnimatePresence initial={false}>
             {documents.map((doc, i) => (
-              <motion.div
+              <motion.li
                 key={doc.id}
                 layout
-                initial={{ opacity: 0, x: -12 }}
+                initial={{ opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -12 }}
-                className="flex items-center gap-3 p-3 rounded-xl bg-ink-50 border border-ink-100"
+                exit={{ opacity: 0, x: -8 }}
+                className="group flex items-center gap-2 p-2.5 rounded-xl bg-ink-50 border border-ink-100"
               >
-                <div className="text-ink-300 cursor-grab">
-                  <GripVertical size={14} />
+                <div className="flex flex-col shrink-0">
+                  <button
+                    onClick={() => move(i, -1)} disabled={i === 0}
+                    aria-label="Move up"
+                    className="p-0.5 text-ink-300 hover:text-ink-700 disabled:opacity-25
+                               disabled:cursor-not-allowed transition-colors duration-120"
+                  >
+                    <ArrowUp size={12} aria-hidden="true" />
+                  </button>
+                  <button
+                    onClick={() => move(i, 1)} disabled={i === documents.length - 1}
+                    aria-label="Move down"
+                    className="p-0.5 text-ink-300 hover:text-ink-700 disabled:opacity-25
+                               disabled:cursor-not-allowed transition-colors duration-120"
+                  >
+                    <ArrowDown size={12} aria-hidden="true" />
+                  </button>
                 </div>
 
                 {editingId === doc.id ? (
                   <>
-                    <input
-                      autoFocus
-                      type="text"
-                      className="input flex-1 text-sm"
-                      value={editingName}
+                    <Input
+                      autoFocus value={editingName}
                       onChange={e => setEditingName(e.target.value)}
                       onKeyDown={e => {
-                        if (e.key === 'Enter') handleUpdate(doc.id)
+                        if (e.key === 'Enter') { e.preventDefault(); handleUpdate(doc.id) }
                         if (e.key === 'Escape') setEditingId(null)
                       }}
+                      className="flex-1 py-1.5"
+                      aria-label="Document name"
                     />
-                    <button
-                      className="btn-ghost p-1.5 text-sage-600"
-                      onClick={() => handleUpdate(doc.id)}
-                    >
-                      <Check size={14} />
-                    </button>
-                    <button
-                      className="btn-ghost p-1.5 text-ink-400"
-                      onClick={() => setEditingId(null)}
-                    >
-                      <X size={14} />
-                    </button>
+                    <Tooltip label="Save">
+                      <button onClick={() => handleUpdate(doc.id)} aria-label="Save"
+                        className="p-1.5 rounded-lg text-sage-600 hover:bg-sage-50 transition-colors duration-120">
+                        <Check size={14} aria-hidden="true" />
+                      </button>
+                    </Tooltip>
+                    <Tooltip label="Cancel">
+                      <button onClick={() => setEditingId(null)} aria-label="Cancel"
+                        className="p-1.5 rounded-lg text-ink-400 hover:bg-ink-100 transition-colors duration-120">
+                        <X size={14} aria-hidden="true" />
+                      </button>
+                    </Tooltip>
                   </>
                 ) : (
                   <>
-                    <span className="flex-1 text-sm text-ink-800">{doc.name}</span>
-                    <button
-                      className="btn-ghost p-1.5"
-                      onClick={() => {
-                        setEditingId(doc.id)
-                        setEditingName(doc.name)
-                      }}
-                    >
-                      <Edit2 size={13} className="text-ink-400" />
-                    </button>
-                    <button
-                      className="btn-ghost p-1.5 text-rose-500 hover:bg-rose-50"
-                      onClick={() => handleDelete(doc.id)}
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    <span className="flex-1 text-sm text-ink-800 truncate">{doc.name}</span>
+                    <Tooltip label="Rename">
+                      <button
+                        onClick={() => { setEditingId(doc.id); setEditingName(doc.name) }}
+                        aria-label={`Rename ${doc.name}`}
+                        className="p-1.5 rounded-lg text-ink-400 hover:bg-ink-200 hover:text-ink-700
+                                   opacity-0 group-hover:opacity-100 focus-visible:opacity-100
+                                   transition-all duration-150"
+                      >
+                        <Edit2 size={13} aria-hidden="true" />
+                      </button>
+                    </Tooltip>
+                    <Tooltip label="Delete — also clears it from every application">
+                      <button
+                        onClick={() => handleDelete(doc)}
+                        aria-label={`Delete ${doc.name}`}
+                        className="p-1.5 rounded-lg text-ink-400 hover:bg-rose-50 hover:text-rose-600
+                                   opacity-0 group-hover:opacity-100 focus-visible:opacity-100
+                                   transition-all duration-150"
+                      >
+                        <Trash2 size={13} aria-hidden="true" />
+                      </button>
+                    </Tooltip>
                   </>
                 )}
-              </motion.div>
+              </motion.li>
             ))}
           </AnimatePresence>
-        </div>
+        </ul>
       )}
     </div>
   )

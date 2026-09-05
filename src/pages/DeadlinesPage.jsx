@@ -1,173 +1,201 @@
-// src/pages/DeadlinesPage.jsx
-import { useEffect, useState } from 'react'
-import { useAuth } from '../hooks/useAuth'
-import { getApplications, getLeads } from '../lib/db'
+import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { CalendarClock, AlertTriangle, CheckCircle2 } from 'lucide-react'
-import { differenceInDays, isPast, format } from 'date-fns'
-import StatusBadge from '../components/StatusBadge'
+import { CalendarClock, CheckCircle2, Download, ChevronDown } from 'lucide-react'
+import { useData } from '../hooks/useData'
+import { useToast } from '../hooks/useToast'
+import { describeDeadline, isOverdue, URGENCY } from '../lib/datetime'
+import { STAGES, isClosed } from '../lib/model'
+import { buildICS, downloadICS } from '../lib/calendar'
+import { RowSkeleton } from '../components/Skeleton'
+import { Button, EmptyState, cn, toneOf } from '../components/ui'
+import { StageBadge, DeadlineDisplay, UrgencyDot, toneForUrgency } from '../components/domain'
 
-function urgencyLevel(days, type) {
-  if (type === 'Application Opens') {
-    if (days < 0) return { label: 'Opened', color: 'bg-sage-50 border-sage-200', dot: 'bg-sage-500', bar: 'bg-sage-400' }
-    if (days <= 7) return { label: '🟢 Opens soon', color: 'bg-sky-50 border-sky-200', dot: 'bg-sky-500 animate-pulse', bar: 'bg-sky-500' }
-    if (days <= 30) return { label: '🔵 Upcoming', color: 'bg-slate-50 border-slate-200', dot: 'bg-slate-400', bar: 'bg-slate-400' }
-    return { label: '⚪ Future', color: 'bg-ink-50 border-ink-200', dot: 'bg-ink-300', bar: 'bg-ink-300' }
-  }
-
-  if (days < 0)  return { label: 'Overdue',  color: 'bg-ink-200 text-ink-500', dot: 'bg-ink-400', bar: 'bg-ink-300' }
-  if (days <= 7)  return { label: '🔴 Critical', color: 'bg-rose-50 border-rose-200', dot: 'bg-rose-500 animate-pulse', bar: 'bg-rose-500' }
-  if (days <= 14) return { label: '🟠 Urgent',   color: 'bg-amber-50 border-amber-200', dot: 'bg-amber-500', bar: 'bg-amber-400' }
-  if (days <= 30) return { label: '🟡 Upcoming', color: 'bg-sky-50 border-sky-200',     dot: 'bg-sky-400',   bar: 'bg-sky-400' }
-  return { label: '🟢 Future',   color: 'bg-sage-50 border-sage-200', dot: 'bg-sage-400', bar: 'bg-sage-400' }
+const KINDS = {
+  opens:    { label: 'Opens',          weight: 1 },
+  deadline: { label: 'Application',    weight: 0 },
+  lor:      { label: 'Recommendations',weight: 0 },
+  decision: { label: 'Decision',       weight: 2 },
 }
 
-function DeadlineRow({ app, deadlineType, date, index }) {
-  const d    = new Date(date)
-  const days = differenceInDays(d, new Date())
-  const urg  = urgencyLevel(days, deadlineType)
-  const past = isPast(d)
+function DeadlineRow({ entry, index, onOpen }) {
+  const { record, kind, d, isLead } = entry
+  const tone = toneForUrgency(d.urgency)
+  const t = toneOf(tone)
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: -12 }}
+    <motion.li
+      initial={{ opacity: 0, x: -8 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.05 }}
-      className={`card p-4 border flex items-center gap-4 ${urg.color} ${past && deadlineType !== 'Application Opens' ? 'opacity-50' : ''}`}
+      transition={{ delay: Math.min(index * 0.025, 0.2), duration: 0.22 }}
     >
-      <div className={`w-3 h-3 rounded-full shrink-0 ${urg.dot}`} />
+      <button
+        onClick={() => onOpen(entry)}
+        className={cn(
+          'w-full text-left bg-white rounded-2xl border shadow-surface hover:shadow-raised',
+          'p-4 flex items-center gap-4 transition-all duration-200',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-400',
+          d.overdue ? 'border-ink-200 opacity-70' : t.border,
+        )}
+      >
+        <UrgencyDot value={record[kindField(kind)]} />
 
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-ink-900 text-sm">{app.university}</span>
-          {app.labName && <span className="text-ink-400 text-xs">· {app.labName}</span>}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-medium text-ink-900 text-sm truncate">{record.university}</span>
+            {isLead && (
+              <span className="text-2xs uppercase tracking-wider text-sky-600 shrink-0">lead</span>
+            )}
+          </div>
+          <p className="text-xs text-ink-500 mt-0.5 truncate">
+            {[record.professor, KINDS[kind].label].filter(Boolean).join(' · ')}
+          </p>
         </div>
-        <div className="text-xs text-ink-500 mt-0.5">
-          {app.professor} · <span className="capitalize">{deadlineType}</span>
-        </div>
-      </div>
 
-      <div className="text-right shrink-0">
-        <div className={`text-sm font-medium ${
-          days < 0 
-            ? (deadlineType === 'Application Opens' ? 'text-sage-600' : 'text-ink-400 line-through') 
-            : days <= 7 
-              ? (deadlineType === 'Application Opens' ? 'text-sky-600' : 'text-rose-700')
-              : days <= 14 
-                ? (deadlineType === 'Application Opens' ? 'text-slate-600' : 'text-amber-700')
-                : 'text-ink-700'
-        }`}>
-          {past ? (deadlineType === 'Application Opens' ? 'OPENED' : 'Passed') : days === 0 ? 'TODAY' : `${days} days`}
+        <div className="text-right shrink-0 hidden sm:block">
+          <DeadlineDisplay value={record[kindField(kind)]} compact />
+          <p className="text-xs text-ink-400 mt-0.5">{d.schoolDate}</p>
+          {d.crossesDay && (
+            <p className="text-2xs text-sky-600">{d.homeDate} your time</p>
+          )}
         </div>
-        <div className="text-xs text-ink-400">{format(d, 'MMM d, yyyy')}</div>
-      </div>
 
-      <StatusBadge status={app.status} />
-    </motion.div>
+        <div className="sm:hidden text-right shrink-0">
+          <DeadlineDisplay value={record[kindField(kind)]} compact />
+        </div>
+
+        {!isLead && <div className="hidden md:block shrink-0"><StageBadge stage={record.stage} short /></div>}
+      </button>
+    </motion.li>
   )
 }
+
+const kindField = (kind) => ({
+  opens: 'startDate', deadline: 'deadline', lor: 'lorDeadline', decision: 'expectedDecision',
+}[kind])
 
 export default function DeadlinesPage() {
-  const { user }   = useAuth()
-  const [apps, setApps]     = useState([])
-  const [leads, setLeads]   = useState([])
-  const [loading, setLoading] = useState(true)
+  const { loading, applications, leads } = useData()
+  const navigate = useNavigate()
+  const toast = useToast()
   const [showPast, setShowPast] = useState(false)
 
-  useEffect(() => {
-    if (!user) return
-    Promise.all([getApplications(user.uid), getLeads(user.uid)])
-      .then(([a, l]) => { setApps(a); setLeads(l) })
-      .finally(() => setLoading(false))
-  }, [user])
+  const entries = useMemo(() => {
+    const out = []
+    const add = (record, kind, isLead) => {
+      const value = record[kindField(kind)]
+      if (!value) return
+      const d = describeDeadline(value)
+      if (d) out.push({ record, kind, d, isLead })
+    }
 
-  // Collect all deadline entries from both apps and non-converted leads
-  const entries = []
-  const allItems = [...apps, ...leads.filter(l => l.status !== 'converted')]
-  
-  allItems.forEach(app => {
-    if (app.startDate)       entries.push({ app, deadlineType: 'Application Opens',    date: app.startDate })
-    if (app.deadline)        entries.push({ app, deadlineType: 'Application deadline', date: app.deadline })
-    if (app.lorDeadline)     entries.push({ app, deadlineType: 'LOR request',          date: app.lorDeadline })
-    if (app.expectedDecision) entries.push({ app, deadlineType: 'Decision expected',   date: app.expectedDecision })
-  })
+    applications.filter(a => !isClosed(a.stage)).forEach(a => {
+      add(a, 'opens', false); add(a, 'deadline', false)
+      add(a, 'lor', false); add(a, 'decision', false)
+    })
+    leads.filter(l => (l.state || 'active') === 'active').forEach(l => {
+      add(l, 'opens', true); add(l, 'deadline', true)
+    })
 
-  const sorted = entries.sort((a, b) => new Date(a.date) - new Date(b.date))
-  const upcoming = sorted.filter(e => !isPast(new Date(e.date)))
-  const past     = sorted.filter(e =>  isPast(new Date(e.date)))
+    return out.sort((a, b) => a.d.instant - b.d.instant)
+  }, [applications, leads])
 
-  const urgentCount = upcoming.filter(e => differenceInDays(new Date(e.date), new Date()) <= 14).length
-  const thisMonth   = upcoming.filter(e => differenceInDays(new Date(e.date), new Date()) <= 30).length
+  const upcoming = entries.filter(e => !e.d.overdue)
+  const past = entries.filter(e => e.d.overdue)
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-40">
-      <div className="w-7 h-7 border-2 border-ink-200 border-t-ink-800 rounded-full animate-spin" />
-    </div>
-  )
+  const byBand = (max) => upcoming.filter(e => e.d.days <= max).length
+
+  const handleOpen = (entry) => {
+    navigate(entry.isLead ? '/leads' : `/applications?open=${entry.record.id}`)
+  }
+
+  const handleExportCalendar = () => {
+    if (entries.length === 0) return
+    const ics = buildICS(entries)
+    downloadICS(ics, 'phdbench-deadlines.ics')
+    toast.success('Calendar file downloaded. Import it into Google Calendar to get reminders.')
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-8 w-40 bg-ink-100 rounded-lg animate-shimmer" />
+        <div className="space-y-2">{Array.from({ length: 5 }, (_, i) => <RowSkeleton key={i} />)}</div>
+      </div>
+    )
+  }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div>
-        <h1 className="section-title">Deadlines</h1>
-        <p className="text-ink-500 text-sm mt-0.5">
-          {upcoming.length} upcoming · {urgentCount} urgent (≤14 days)
-        </p>
-      </div>
-
-      {/* Summary chips */}
-      <div className="flex flex-wrap gap-3">
-        {[
-          { label: 'Critical (≤7d)',  count: upcoming.filter(e => differenceInDays(new Date(e.date), new Date()) <= 7).length,  color: 'bg-rose-100 text-rose-700' },
-          { label: 'Urgent (≤14d)',   count: upcoming.filter(e => differenceInDays(new Date(e.date), new Date()) <= 14).length, color: 'bg-amber-100 text-amber-700' },
-          { label: 'This month',      count: thisMonth,                                                                          color: 'bg-sky-100 text-sky-700' },
-          { label: 'Total upcoming',  count: upcoming.length,                                                                    color: 'bg-ink-100 text-ink-600' },
-        ].map(s => (
-          <div key={s.label} className={`px-4 py-2 rounded-xl text-sm font-medium ${s.color}`}>
-            <span className="font-bold">{s.count}</span> {s.label}
-          </div>
-        ))}
-      </div>
-
-      {/* Upcoming */}
-      {upcoming.length === 0 ? (
-        <div className="card p-12 text-center">
-          <CheckCircle2 size={32} className="mx-auto mb-3 text-sage-400" />
-          <p className="text-ink-600 font-medium">You're all clear!</p>
-          <p className="text-ink-400 text-sm mt-1">No upcoming deadlines. Great job staying on top of things.</p>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display text-3xl text-ink-900">Deadlines</h1>
+          <p className="text-ink-500 text-sm mt-1">
+            {upcoming.length} ahead
+            {past.length > 0 && ` · ${past.length} passed`}
+          </p>
         </div>
-      ) : (
-        <div className="space-y-2">
-          <div className="text-xs font-medium text-ink-500 uppercase tracking-wider mb-2">Upcoming</div>
-          {upcoming.map((e, i) => (
-            <DeadlineRow key={`${e.app.id}-${e.deadlineType}`} {...e} index={i} />
+        {entries.length > 0 && (
+          <Button variant="secondary" icon={Download} onClick={handleExportCalendar}>
+            Add to calendar
+          </Button>
+        )}
+      </div>
+
+      {/* Charter #2: bands give each number something to be measured against. */}
+      {upcoming.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: 'Within 7 days',  count: byBand(7),  tone: 'rose' },
+            { label: 'Within 14 days', count: byBand(14), tone: 'amber' },
+            { label: 'This month',     count: byBand(30), tone: 'sky' },
+            { label: 'All upcoming',   count: upcoming.length, tone: 'ink' },
+          ].map(s => (
+            <div key={s.label} className={cn('rounded-2xl px-4 py-3', toneOf(s.tone).soft)}>
+              <div className="font-display text-2xl tabular-nums leading-none">{s.count}</div>
+              <div className="text-xs mt-1.5 opacity-80">{s.label}</div>
+            </div>
           ))}
         </div>
       )}
 
-      {/* Past deadlines toggle */}
+      {upcoming.length === 0 ? (
+        <EmptyState
+          icon={entries.length === 0 ? CalendarClock : CheckCircle2}
+          title={entries.length === 0 ? 'No dates recorded yet' : 'Nothing ahead of you'}
+          description={
+            entries.length === 0
+              ? 'Add deadlines to your applications and leads — with the university\'s timezone — and they will all appear here in order.'
+              : 'Every deadline you are tracking has passed. Time to find some more positions.'
+          }
+        />
+      ) : (
+        <ul className="space-y-2">
+          {upcoming.map((entry, i) => (
+            <DeadlineRow key={`${entry.record.id}-${entry.kind}`} entry={entry} index={i} onOpen={handleOpen} />
+          ))}
+        </ul>
+      )}
+
       {past.length > 0 && (
         <div>
           <button
-            className="btn-ghost text-xs"
             onClick={() => setShowPast(p => !p)}
+            className="flex items-center gap-1.5 text-xs text-ink-500 hover:text-ink-800
+                       px-3 py-2 rounded-lg hover:bg-ink-100 transition-colors duration-120
+                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-300"
           >
-            {showPast ? '▲ Hide' : '▼ Show'} {past.length} past deadline{past.length !== 1 ? 's' : ''}
+            <ChevronDown size={13} className={cn('transition-transform duration-150', showPast && 'rotate-180')} aria-hidden="true" />
+            {showPast ? 'Hide' : 'Show'} {past.length} that {past.length === 1 ? 'has' : 'have'} passed
           </button>
-          {showPast && (
-            <div className="space-y-2 mt-3">
-              {past.map((e, i) => (
-                <DeadlineRow key={`past-${e.app.id}-${e.deadlineType}`} {...e} index={i} />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
-      {entries.length === 0 && (
-        <div className="card p-12 text-center">
-          <CalendarClock size={32} className="mx-auto mb-3 text-ink-300" />
-          <p className="text-ink-400 text-sm">No deadlines yet. Add them in your applications.</p>
+          {showPast && (
+            <ul className="space-y-2 mt-3">
+              {past.map((entry, i) => (
+                <DeadlineRow key={`past-${entry.record.id}-${entry.kind}`} entry={entry} index={i} onOpen={handleOpen} />
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </div>

@@ -1,423 +1,351 @@
-// src/pages/StatsPage.jsx
-import { useEffect, useState } from 'react'
-import { useAuth } from '../hooks/useAuth'
-import { getApplications, getLeads, getDocuments } from '../lib/db'
+import { useMemo } from 'react'
 import { motion } from 'framer-motion'
 import {
-  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend,
-  RadialBarChart, RadialBar, PolarAngleAxis, PolarRadiusAxis
+  PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from 'recharts'
-import { BarChart3 } from 'lucide-react'
+import { BarChart3, Info } from 'lucide-react'
+import { useData } from '../hooks/useData'
+import {
+  submittedApplications, preparingApplications, responseRate,
+  emailReplyRate, docsProgress,
+} from '../lib/derive'
+import { STAGES, STAGE_ORDER, PRIORITIES, countryByCode } from '../lib/model'
+import { feeInINR, formatINR } from '../components/domain'
+import { PageSkeleton } from '../components/Skeleton'
+import { EmptyState, SectionTitle, Tooltip, cn, toneOf } from '../components/ui'
 
-const STATUS_COLORS = {
-  applied:   '#e8ad2a',
-  emailed:   '#448d65',
-  interview: '#f43f5e',
-  offer:     '#22c55e',
-  rejected:  '#b8b19a',
+const TONE_HEX = {
+  ink: '#978d76', sage: '#448d65', success: '#22c55e',
+  amber: '#e8ad2a', rose: '#f43f5e', sky: '#38bdf8',
 }
 
-const TYPE_COLORS = {
-  portal: '#38bdf8',
-  email:  '#a78bfa',
-  both:   '#fb923c',
-}
+const AREA_COLORS = ['#448d65', '#e8ad2a', '#38bdf8', '#f43f5e', '#a78bfa', '#fb923c', '#22c55e', '#94a3b8']
 
-const AREA_COLORS = [
-  '#448d65','#e8ad2a','#38bdf8','#f43f5e','#a78bfa','#fb923c','#22c55e','#94a3b8'
-]
-
-const RADIAL_COLORS = [
-  '#448d65', '#38bdf8', '#e8ad2a', '#f43f5e', 
-  '#a78bfa', '#fb923c', '#22c55e', '#14b8a6',
-  '#ec4899', '#06b6d4', '#8b5cf6', '#f59e0b'
-]
-
-function StatCard({ label, value, sub, color = 'bg-ink-900', delay = 0 }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-      transition={{ delay, duration: 0.4 }}
-      className="stat-card"
-    >
-      <div className="font-display text-4xl text-ink-900">{value}</div>
-      <div className="text-ink-700 text-sm font-medium">{label}</div>
-      {sub && <div className="text-ink-400 text-xs">{sub}</div>}
-    </motion.div>
-  )
-}
-
-function SectionTitle({ children }) {
-  return (
-    <div className="text-xs font-semibold text-ink-400 uppercase tracking-widest mb-4 pb-2 border-b border-ink-100">
-      {children}
-    </div>
-  )
-}
-
-const CustomTooltip = ({ active, payload, label }) => {
+function ChartTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-white border border-ink-200 rounded-xl shadow-lg p-3 text-sm">
+    <div className="bg-white border border-ink-200 rounded-xl shadow-float p-3 text-sm">
       {label && <div className="text-ink-500 text-xs mb-1 capitalize">{label}</div>}
       {payload.map(p => (
         <div key={p.name} className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full" style={{ background: p.color || p.fill }} />
-          <span className="text-ink-700 capitalize">{p.name}:</span>
-          <span className="font-medium text-ink-900">{p.value}</span>
+          <span className="w-2 h-2 rounded-full" style={{ background: p.color || p.fill }} aria-hidden="true" />
+          <span className="text-ink-700">{p.name}:</span>
+          <span className="font-medium text-ink-900 tabular-nums">{p.value}</span>
         </div>
       ))}
     </div>
   )
 }
 
+/**
+ * Charter #2: a bare percentage means nothing. Every headline number carries
+ * the fraction it came from, so "50%" cannot hide the fact that it is one out
+ * of two.
+ */
+function StatCard({ label, value, context, note, delay = 0 }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, duration: 0.3 }}
+      className="bg-white rounded-2xl border border-ink-100 shadow-surface p-5"
+    >
+      <div className="font-display text-3xl text-ink-900 tabular-nums leading-none">{value}</div>
+      <div className="text-ink-700 text-sm font-medium mt-2">{label}</div>
+      {context && <div className="text-ink-400 text-xs mt-0.5">{context}</div>}
+      {note && (
+        <Tooltip label={note}>
+          <span className="inline-flex items-center gap-1 text-2xs text-ink-300 mt-1.5">
+            <Info size={10} aria-hidden="true" /> how this is counted
+          </span>
+        </Tooltip>
+      )}
+    </motion.div>
+  )
+}
+
+function Panel({ title, children, delay = 0, className }) {
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, duration: 0.3 }}
+      className={cn('bg-white rounded-2xl border border-ink-100 shadow-surface p-5', className)}
+    >
+      <SectionTitle>{title}</SectionTitle>
+      {children}
+    </motion.section>
+  )
+}
+
 export default function StatsPage() {
-  const { user } = useAuth()
-  const [apps,  setApps]  = useState([])
-  const [leads, setLeads] = useState([])
-  const [documents, setDocuments] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { loading, applications, leads, documents } = useData()
 
-  useEffect(() => {
-    if (!user) return
-    Promise.all([getApplications(user.uid), getLeads(user.uid), getDocuments(user.uid)])
-      .then(([a, l, d]) => { setApps(a); setLeads(l); setDocuments(d) })
-      .finally(() => setLoading(false))
-  }, [user])
+  const sent = submittedApplications(applications)
+  const preparing = preparingApplications(applications)
+  const response = responseRate(applications)
+  const replies = emailReplyRate(applications)
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-40">
-      <div className="w-7 h-7 border-2 border-ink-200 border-t-ink-800 rounded-full animate-spin" />
-    </div>
-  )
+  const stageData = useMemo(() => STAGE_ORDER
+    .map(stage => ({
+      name: STAGES[stage].short,
+      value: applications.filter(a => a.stage === stage).length,
+      color: TONE_HEX[STAGES[stage].tone] || TONE_HEX.ink,
+    }))
+    .filter(d => d.value > 0), [applications])
 
-  if (apps.length === 0 && leads.length === 0) return (
-    <div className="card p-16 text-center animate-fade-in">
-      <BarChart3 size={36} className="mx-auto mb-3 text-ink-300" />
-      <p className="text-ink-600 font-medium">No data yet</p>
-      <p className="text-ink-400 text-sm mt-1">Add some leads and applications to see your stats.</p>
-    </div>
-  )
+  const countryData = useMemo(() => {
+    const counts = {}
+    applications.forEach(a => {
+      const name = countryByCode(a.country)?.name || 'Unspecified'
+      counts[name] = (counts[name] || 0) + 1
+    })
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, value], i) => ({ name, value, color: AREA_COLORS[i % AREA_COLORS.length] }))
+  }, [applications])
 
-  // ── Compute datasets ──────────────────────────────────────
-  const totalApps     = apps.length
-  const totalLeads    = leads.length
-  const responseRate  = totalApps > 0
-    ? Math.round((apps.filter(a => ['interview','offer'].includes(a.status)).length / totalApps) * 100)
-    : 0
-  const emailReplyRate = apps.filter(a => a.applicationType !== 'portal').length > 0
-    ? Math.round((apps.filter(a => a.emailReplied).length / apps.filter(a => a.applicationType !== 'portal').length) * 100)
-    : 0
+  const areaData = useMemo(() => {
+    const counts = {}
+    applications.forEach(a => {
+      const name = a.researchArea || 'Unspecified'
+      counts[name] = (counts[name] || 0) + 1
+    })
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, value], i) => ({ name, value, color: AREA_COLORS[i % AREA_COLORS.length] }))
+  }, [applications])
 
-  // Document submission analysis
-  const docStats = documents.map(doc => {
-    const count = apps.filter(a => {
-      const isRequired = (a.requiredDocs || []).includes(doc.id)
-      const isSubmitted = a.submittedDocs?.[doc.id] || a.docs?.[doc.id]
-      return isRequired && isSubmitted
-    }).length
-    return { id: doc.id, name: doc.name, count, percentage: totalApps > 0 ? Math.round((count / totalApps) * 100) : 0 }
-  })
+  const monthly = useMemo(() => {
+    const out = []
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date()
+      d.setMonth(d.getMonth() - i)
+      const month = d.toLocaleString('default', { month: 'short' })
+      const count = applications.filter(a => {
+        // Count when it was *sent*, not when the card was created — those are
+        // different events, and only one of them is an application.
+        const stamp = a.submittedAt?.seconds
+        if (!stamp) return false
+        const sentDate = new Date(stamp * 1000)
+        return sentDate.getMonth() === d.getMonth() && sentDate.getFullYear() === d.getFullYear()
+      }).length
+      out.push({ month, count })
+    }
+    return out
+  }, [applications])
 
-  const docStatsSorted = [...docStats].sort((a, b) => b.percentage - a.percentage)
+  const spend = useMemo(() => {
+    const paid = applications.reduce((sum, a) => sum + (a.fee?.waiverGranted ? 0 : feeInINR(a.fee)), 0)
+    const waived = applications.filter(a => a.fee?.waiverGranted).length
+    return { paid, waived }
+  }, [applications])
 
-  // Average docs based on what's required per app, not total
-  const docsAvg = totalApps > 0 && documents.length > 0
-    ? Math.round(apps.reduce((acc, a) => {
-        const requiredCount = (a.requiredDocs || []).length
-        const submittedCount = (a.requiredDocs || []).filter(docId =>
-          a.submittedDocs?.[docId] || a.docs?.[docId]
-        ).length
-        return acc + submittedCount
-      }, 0) / totalApps * 10) / 10
-    : 0
+  const docStats = useMemo(() => {
+    if (sent.length === 0) return []
+    return documents.map(doc => {
+      const requiredBy = applications.filter(a => (a.requiredDocs || []).includes(doc.id))
+      const submitted = requiredBy.filter(a => (a.submittedDocs || a.docs || {})[doc.id]).length
+      return {
+        id: doc.id,
+        name: doc.name,
+        requiredBy: requiredBy.length,
+        submitted,
+        // Measured against the applications that actually ask for it, not
+        // against every application — the old version divided by the total,
+        // which made a rarely-required document look like a failure.
+        percentage: requiredBy.length ? Math.round((submitted / requiredBy.length) * 100) : 0,
+      }
+    }).filter(d => d.requiredBy > 0).sort((a, b) => b.percentage - a.percentage)
+  }, [documents, applications, sent.length])
 
-  // Status distribution
-  const statusData = Object.entries(STATUS_COLORS).map(([status, color]) => ({
-    name: status,
-    value: apps.filter(a => a.status === status).length,
-    color,
-  })).filter(d => d.value > 0)
+  if (loading) return <PageSkeleton />
 
-  // App type distribution
-  const typeData = Object.entries(TYPE_COLORS).map(([type, color]) => ({
-    name: type,
-    value: apps.filter(a => a.applicationType === type).length,
-    color,
-  })).filter(d => d.value > 0)
-
-  // Research area distribution
-  const areaCounts = {}
-  apps.forEach(a => {
-    const k = a.researchArea || 'Unspecified'
-    areaCounts[k] = (areaCounts[k] || 0) + 1
-  })
-  const areaData = Object.entries(areaCounts)
-    .sort((a, b) => b[1] - a[1])
-    .map(([name, value], i) => ({ name, value, color: AREA_COLORS[i % AREA_COLORS.length] }))
-
-  // Monthly pipeline (last 6 months)
-  const monthlyData = []
-  for (let i = 5; i >= 0; i--) {
-    const d    = new Date()
-    d.setMonth(d.getMonth() - i)
-    const month = d.toLocaleString('default', { month: 'short' })
-    const yr    = d.getFullYear()
-    const mm    = d.getMonth()
-    const count = apps.filter(a => {
-      if (!a.createdAt?.seconds) return false
-      const ad = new Date(a.createdAt.seconds * 1000)
-      return ad.getMonth() === mm && ad.getFullYear() === yr
-    }).length
-    monthlyData.push({ month, count })
+  if (applications.length === 0 && leads.length === 0) {
+    return (
+      <div className="space-y-6">
+        <h1 className="font-display text-3xl text-ink-900">Stats</h1>
+        <EmptyState
+          icon={BarChart3}
+          title="Nothing to measure yet"
+          description="Once you have leads and applications, this page shows where they stand, how they are distributed, and what the cycle is costing you."
+        />
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Header */}
+    <div className="space-y-6">
       <div>
-        <h1 className="section-title">Stats</h1>
-        <p className="text-ink-500 text-sm mt-0.5">Your PhD application analytics at a glance.</p>
+        <h1 className="font-display text-3xl text-ink-900">Stats</h1>
+        <p className="text-ink-500 text-sm mt-1 max-w-prose leading-relaxed">
+          Only applications you have marked <strong>submitted</strong> or later count
+          as sent. Drafts are counted separately, so starting a new one never makes
+          your numbers look worse.
+        </p>
       </div>
 
-      {/* Top stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total leads"     value={totalLeads}                    sub="saved"           delay={0} />
-        <StatCard label="Applications"    value={totalApps}                     sub="submitted"       delay={0.07} />
-        <StatCard label="Response rate"   value={`${responseRate}%`}            sub="interview/offer" delay={0.14} />
-        <StatCard label="Email reply rate" value={`${emailReplyRate}%`}         sub="of cold emails"  delay={0.21} />
+        <StatCard label="Leads saved" value={leads.length}
+          context={`${leads.filter(l => (l.state || 'active') === 'active').length} still active`} delay={0} />
+        <StatCard label="Submitted" value={sent.length}
+          context={preparing.length ? `${preparing.length} still in preparation` : 'nothing in the drawer'}
+          note="Counts applications at Submitted, Under review, Interview, Offer, Waitlist, Rejected, Withdrawn or Missed."
+          delay={0.05} />
+        <StatCard
+          label="Response rate"
+          value={response ? `${response.rate}%` : '—'}
+          context={response ? `${response.responded} of ${response.sent} sent` : 'nothing sent yet'}
+          note="Interview, offer or waitlist, over applications actually submitted."
+          delay={0.1}
+        />
+        <StatCard
+          label="Email replies"
+          value={replies ? `${replies.rate}%` : '—'}
+          context={replies ? `${replies.replied} of ${replies.sent} emailed` : 'no outreach yet'}
+          note="Counted over applications where you recorded sending an email."
+          delay={0.15}
+        />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Status breakdown */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25, duration: 0.4 }}
-          className="card p-5"
-        >
-          <SectionTitle>Application status breakdown</SectionTitle>
-          {statusData.length === 0 ? (
-            <p className="text-ink-400 text-sm text-center py-8">No data</p>
+        <Panel title="Where everything stands" delay={0.2}>
+          {stageData.length === 0 ? (
+            <p className="text-ink-400 text-sm text-center py-8">No applications yet.</p>
           ) : (
-            <div className="flex items-center gap-6">
-              <ResponsiveContainer width="50%" height={200}>
+            <div className="flex flex-col sm:flex-row items-center gap-6">
+              <ResponsiveContainer width="100%" height={190} className="max-w-[190px]">
                 <PieChart>
-                  <Pie data={statusData} cx="50%" cy="50%" innerRadius={50} outerRadius={80}
+                  <Pie data={stageData} cx="50%" cy="50%" innerRadius={48} outerRadius={78}
                     paddingAngle={3} dataKey="value">
-                    {statusData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                    {stageData.map((d, i) => <Cell key={i} fill={d.color} />)}
                   </Pie>
-                  <Tooltip content={<CustomTooltip />} />
+                  <RTooltip content={<ChartTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
-              <div className="flex-1 space-y-2">
-                {statusData.map(d => (
-                  <div key={d.name} className="flex items-center gap-2 text-sm">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: d.color }} />
-                    <span className="text-ink-600 capitalize flex-1">{d.name}</span>
-                    <span className="font-medium text-ink-900">{d.value}</span>
-                  </div>
+              <ul className="flex-1 space-y-1.5 w-full">
+                {stageData.map(d => (
+                  <li key={d.name} className="flex items-center gap-2 text-sm">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: d.color }} aria-hidden="true" />
+                    <span className="text-ink-600 flex-1 truncate">{d.name}</span>
+                    <span className="font-medium text-ink-900 tabular-nums">{d.value}</span>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           )}
-        </motion.div>
+        </Panel>
 
-        {/* App type breakdown */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.4 }}
-          className="card p-5"
-        >
-          <SectionTitle>Application type</SectionTitle>
-          {typeData.length === 0 ? (
-            <p className="text-ink-400 text-sm text-center py-8">No data</p>
+        <Panel title="Countries" delay={0.25}>
+          {countryData.length === 0 ? (
+            <p className="text-ink-400 text-sm text-center py-8">No applications yet.</p>
           ) : (
-            <div className="flex items-center gap-6">
-              <ResponsiveContainer width="50%" height={200}>
-                <PieChart>
-                  <Pie data={typeData} cx="50%" cy="50%" innerRadius={50} outerRadius={80}
-                    paddingAngle={3} dataKey="value">
-                    {typeData.map((d, i) => <Cell key={i} fill={d.color} />)}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="flex-1 space-y-2">
-                {typeData.map(d => (
-                  <div key={d.name} className="flex items-center gap-2 text-sm">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: d.color }} />
-                    <span className="text-ink-600 capitalize flex-1">{d.name}</span>
-                    <span className="font-medium text-ink-900">{d.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <ul className="space-y-3">
+              {countryData.map(d => (
+                <li key={d.name} className="flex items-center gap-3">
+                  <span className="text-sm text-ink-700 w-32 shrink-0 truncate">{d.name}</span>
+                  <span className="flex-1 h-4 bg-ink-100 rounded-full overflow-hidden shadow-inset">
+                    <motion.span
+                      className="block h-full rounded-full"
+                      style={{ background: d.color }}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(d.value / applications.length) * 100}%` }}
+                      transition={{ duration: 0.6, delay: 0.3 }}
+                    />
+                  </span>
+                  <span className="text-sm font-medium text-ink-900 w-6 text-right tabular-nums shrink-0">
+                    {d.value}
+                  </span>
+                </li>
+              ))}
+            </ul>
           )}
-        </motion.div>
+        </Panel>
       </div>
 
-      {/* Monthly applications */}
-      {totalApps > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35, duration: 0.4 }}
-          className="card p-5"
-        >
-          <SectionTitle>Applications over time (last 6 months)</SectionTitle>
+      {monthly.some(m => m.count > 0) && (
+        <Panel title="Applications submitted, last six months" delay={0.3}>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={monthlyData} barSize={32}>
+            <BarChart data={monthly} barSize={30}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ece9de" vertical={false} />
               <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#7a705e' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 12, fill: '#7a705e' }} axisLine={false} tickLine={false} allowDecimals={false} />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="count" name="Applications" fill="#1a1914" radius={[6, 6, 0, 0]} />
+              <RTooltip content={<ChartTooltip />} cursor={{ fill: '#f6f5f0' }} />
+              <Bar dataKey="count" name="Submitted" fill="#1a1914" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </motion.div>
+        </Panel>
       )}
 
-      {/* Research areas */}
-      {areaData.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4, duration: 0.4 }}
-          className="card p-5"
-        >
-          <SectionTitle>Research areas applied to</SectionTitle>
-          <div className="space-y-3">
-            {areaData.map(d => (
-              <div key={d.name} className="flex items-center gap-3">
-                <div className="text-sm text-ink-700 w-40 shrink-0 truncate">{d.name}</div>
-                <div className="flex-1 h-5 bg-ink-100 rounded-full overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }} animate={{ width: `${(d.value / totalApps) * 100}%` }}
-                    transition={{ delay: 0.5, duration: 0.6 }}
-                    className="h-full rounded-full"
-                    style={{ background: d.color }}
-                  />
-                </div>
-                <div className="text-sm font-medium text-ink-900 w-6 text-right shrink-0">{d.value}</div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      )}
-
-      {/* Document submission analysis - Clean Radial Bar Chart */}
-      {totalApps > 0 && documents.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.45, duration: 0.4 }}
-          className="card p-8"
-        >
-          <SectionTitle>Document submission breakdown</SectionTitle>
-
-          <div className="grid grid-cols-1 lg:grid-cols-[220px,1fr] gap-8 items-center">
-            {/* Left: Labels and values */}
-            <div className="space-y-3 w-full">
-              {docStatsSorted.map((doc, i) => (
-                <div key={doc.id} className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ background: RADIAL_COLORS[i % RADIAL_COLORS.length] }}
+      <div className="grid lg:grid-cols-2 gap-6">
+        {areaData.length > 0 && (
+          <Panel title="Research areas" delay={0.35}>
+            <ul className="space-y-3">
+              {areaData.map(d => (
+                <li key={d.name} className="flex items-center gap-3">
+                  <span className="text-sm text-ink-700 w-36 shrink-0 truncate">{d.name}</span>
+                  <span className="flex-1 h-4 bg-ink-100 rounded-full overflow-hidden shadow-inset">
+                    <motion.span
+                      className="block h-full rounded-full"
+                      style={{ background: d.color }}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(d.value / applications.length) * 100}%` }}
+                      transition={{ duration: 0.6, delay: 0.4 }}
                     />
-                    <span className="text-ink-700 font-medium truncate">{doc.name}</span>
-                  </div>
-                  <span className="text-ink-900 font-bold shrink-0">{doc.percentage}%</span>
-                </div>
+                  </span>
+                  <span className="text-sm font-medium text-ink-900 w-6 text-right tabular-nums shrink-0">
+                    {d.value}
+                  </span>
+                </li>
               ))}
+            </ul>
+          </Panel>
+        )}
+
+        {spend.paid > 0 && (
+          <Panel title="What this cycle has cost" delay={0.4}>
+            <div className="font-display text-4xl text-ink-900 tabular-nums">
+              {formatINR(spend.paid)}
             </div>
+            <p className="text-sm text-ink-500 mt-2 leading-relaxed">
+              across {applications.filter(a => feeInINR(a.fee) > 0 && !a.fee?.waiverGranted).length} applications
+              {spend.waived > 0 && `, with ${spend.waived} fee${spend.waived === 1 ? '' : 's'} waived`}.
+            </p>
+            {sent.length > 0 && (
+              <p className="text-xs text-ink-400 mt-3">
+                {formatINR(Math.round(spend.paid / Math.max(sent.length, 1)))} per submitted application on average.
+              </p>
+            )}
+          </Panel>
+        )}
+      </div>
 
-            {/* Right: Radial Chart */}
-            <div className="w-full">
-              <ResponsiveContainer width="100%" height={360}>
-                <RadialBarChart
-                  data={docStatsSorted}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius="20%"
-                  outerRadius="92%"
-                  startAngle={90}
-                  endAngle={-270}
-                  barSize={14}
-                  margin={{ top: 10, right: 10, bottom: 10, left: 10 }}
-                >
-                  <PolarAngleAxis
-                    type="number"
-                    domain={[0, 100]}
-                    tick={false}
-                    axisLine={false}
-                  />
-                  <PolarRadiusAxis
-                    type="category"
-                    dataKey="name"
-                    tick={false}
-                    axisLine={false}
-                  />
-
-                  <RadialBar
-                    dataKey="percentage"
-                    cornerRadius={999}
-                    clockWise
-                    background={{ fill: '#ece9de' }}
-                    animationDuration={1200}
-                    animationEasing="ease-out"
-                  >
-                    {docStatsSorted.map((d, i) => (
-                      <Cell key={d.id} fill={RADIAL_COLORS[i % RADIAL_COLORS.length]} />
-                    ))}
-                  </RadialBar>
-
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (!active || !payload?.length) return null
-                      const item = payload[0].payload
-                      return (
-                        <div className="bg-ink-900 text-white rounded-xl shadow-xl p-3 text-sm border border-ink-700">
-                          <div className="font-bold">{item.name}</div>
-                          <div className="mt-1 text-ink-200">
-                            {item.count} of {totalApps} submitted
-                          </div>
-                          <div className="text-sage-300 font-bold mt-1">
-                            {item.percentage}%
-                          </div>
-                        </div>
-                      )
-                    }}
-                  />
-                </RadialBarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="mt-8 pt-6 border-t border-ink-100 text-center">
-            <div className="font-display text-3xl text-ink-900">{docsAvg}</div>
-            <div className="text-ink-400 text-sm mt-1">
-              documents submitted on average per application
-            </div>
-          </div>
-        </motion.div>
-      )}
-
-
-
-      {totalApps > 0 && documents.length === 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.45, duration: 0.4 }}
-          className="card p-5 text-center"
-        >
-          <SectionTitle className="text-center">Document analysis</SectionTitle>
-          <p className="text-ink-400 text-sm">
-            No documents configured yet.{' '}
-            <a href="/settings" className="text-sage-600 hover:underline">
-              Set up your documents in Settings
-            </a>
+      {docStats.length > 0 && (
+        <Panel title="Document readiness" delay={0.45}>
+          <p className="text-xs text-ink-400 mb-4 leading-relaxed max-w-prose">
+            Measured against the applications that actually require each document,
+            not against everything — a document only two universities ask for is not
+            failing because the other ten do not need it.
           </p>
-        </motion.div>
+          <ul className="space-y-3">
+            {docStats.map((doc, i) => (
+              <li key={doc.id} className="flex items-center gap-3">
+                <span className="text-sm text-ink-700 w-44 shrink-0 truncate">{doc.name}</span>
+                <span className="flex-1 h-4 bg-ink-100 rounded-full overflow-hidden shadow-inset">
+                  <motion.span
+                    className="block h-full rounded-full"
+                    style={{ background: doc.percentage === 100 ? '#448d65' : AREA_COLORS[i % AREA_COLORS.length] }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.max(doc.percentage, 3)}%` }}
+                    transition={{ duration: 0.6, delay: 0.5 }}
+                  />
+                </span>
+                <span className="text-xs text-ink-500 w-20 text-right tabular-nums shrink-0">
+                  {doc.submitted}/{doc.requiredBy}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Panel>
       )}
     </div>
   )
