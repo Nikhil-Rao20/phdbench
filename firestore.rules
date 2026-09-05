@@ -5,7 +5,7 @@ rules_version = '2';
 //
 // ⚠️  BEFORE PUBLISHING: confirm OWNER_EMAIL below is the exact Google account
 //     you sign in with. Publishing with the wrong address locks you out of
-//     your own data. See docs/FIREBASE.md for how to publish these.
+//     your own data. Confirmed 2026-09-05. See the README for how to publish.
 //
 // Model: every document lives under /users/{uid}/... and only the owner's
 // authenticated, email-verified account may touch its own subtree. Anyone else
