@@ -22,6 +22,7 @@ import {
 } from './domain'
 import { Button, Badge, Progress, SectionTitle, Tooltip, CopiedPill, cn } from './ui'
 import { Select, TextArea, Input } from './form'
+import EmailComposer from './EmailComposer'
 
 const TABS = [
   { id: 'overview',  label: 'Overview',  icon: FileText },
@@ -316,10 +317,17 @@ export default function ApplicationDetailPanel({ appId, uid, onClose, onEdit }) 
                 </section>
               )}
 
+              {/* Outreach — the composer is available whether or not you have
+                  emailed yet, since the common need is writing the first one. */}
+              <section>
+                <SectionTitle>Write to the professor</SectionTitle>
+                <EmailComposer application={app} />
+              </section>
+
               {/* Email */}
               {app.emailed?.sentAt && (
                 <section>
-                  <SectionTitle>Outreach</SectionTitle>
+                  <SectionTitle>Outreach record</SectionTitle>
                   <Row label="Emailed on">{app.emailed.sentAt}</Row>
                   {app.emailed.subject && (
                     <div className="flex items-center gap-2 mt-2 p-2.5 rounded-lg bg-ink-50">

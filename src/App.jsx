@@ -8,6 +8,7 @@ import Layout from './components/Layout'
 import SEOManager from './components/SEOManager'
 import NotAuthorized from './components/NotAuthorized'
 import { PageSkeleton } from './components/Skeleton'
+import CommandPalette from './components/CommandPalette'
 import Dashboard from './pages/Dashboard'
 
 const LeadsPage = lazy(() => import('./pages/LeadsPage'))
@@ -135,6 +136,7 @@ export default function App() {
   return (
     <DataProvider>
       <SEOManager isAuthenticated />
+      <CommandPalette />
       <Layout>
         <Suspense fallback={<PageSkeleton />}>
           <Routes>

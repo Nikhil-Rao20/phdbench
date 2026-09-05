@@ -5,6 +5,7 @@ import App from './App'
 import { AuthProvider } from './hooks/useAuth'
 import { ToastProvider } from './hooks/useToast'
 import Toaster from './components/Toaster'
+import ConnectionStatus from './components/ConnectionStatus'
 import ErrorBoundary from './components/ErrorBoundary'
 import './index.css'
 
@@ -34,6 +35,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <AuthProvider>
             <App />
             <Toaster />
+            <ConnectionStatus />
           </AuthProvider>
         </ToastProvider>
       </BrowserRouter>

@@ -1,9 +1,13 @@
 // src/components/AttentionPanel.jsx
-// The loud in-app reminder layer.
+// The in-app reminder layer.
 //
-// Charter #7 (hierarchy) and #10 (colour with a job): this is the single most
-// important thing on the dashboard, so it sits at the top, and severity is
-// carried by colour *and* icon *and* wording — never colour alone.
+// It sits below the dashboard stats and starts collapsed: opening the app to a
+// wall of warnings every single time is punishing, and a warning you see every
+// day stops registering as a warning at all. The always-visible summary row
+// carries the counts, so collapsing hides the detail and never the signal.
+//
+// Charter #10 (colour with a job): severity is carried by colour *and* icon
+// *and* wording, never colour alone.
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -83,28 +87,26 @@ const STORAGE_KEY = 'phdbench:attention-open'
 /**
  * Whether the panel starts open.
  *
- * A wall of warnings as the first thing you see every single time is
- * oppressive, so the panel is a collapsed summary by default. The exception is
- * genuinely urgent items — if something cannot wait, it opens itself. A manual
- * choice is remembered and wins over both.
+ * Collapsed by default, always. A wall of warnings as the first thing you see
+ * every single time is oppressive — the summary row keeps the counts visible,
+ * so nothing is hidden, and opening it is one click. A manual choice is
+ * remembered so the panel stays however you last left it.
  */
-function useInitialOpen(hasCritical) {
+function useInitialOpen() {
   return useState(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored === 'open') return true
-      if (stored === 'closed') return false
+      return localStorage.getItem(STORAGE_KEY) === 'open'
     } catch {
       // Private browsing and blocked site data both throw here.
+      return false
     }
-    return hasCritical
   })
 }
 
 export default function AttentionPanel({ items, counts, onOpenApplication }) {
   const navigate = useNavigate()
   const [expanded, setExpanded] = useState(false)
-  const [open, setOpen] = useInitialOpen(counts.critical > 0)
+  const [open, setOpen] = useInitialOpen()
 
   const toggle = () => {
     setOpen(o => {
