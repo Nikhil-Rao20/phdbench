@@ -78,9 +78,41 @@ function AttentionRow({ item, index, onOpen }) {
   )
 }
 
+const STORAGE_KEY = 'phdbench:attention-open'
+
+/**
+ * Whether the panel starts open.
+ *
+ * A wall of warnings as the first thing you see every single time is
+ * oppressive, so the panel is a collapsed summary by default. The exception is
+ * genuinely urgent items — if something cannot wait, it opens itself. A manual
+ * choice is remembered and wins over both.
+ */
+function useInitialOpen(hasCritical) {
+  return useState(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      if (stored === 'open') return true
+      if (stored === 'closed') return false
+    } catch {
+      // Private browsing and blocked site data both throw here.
+    }
+    return hasCritical
+  })
+}
+
 export default function AttentionPanel({ items, counts, onOpenApplication }) {
   const navigate = useNavigate()
   const [expanded, setExpanded] = useState(false)
+  const [open, setOpen] = useInitialOpen(counts.critical > 0)
+
+  const toggle = () => {
+    setOpen(o => {
+      const next = !o
+      try { localStorage.setItem(STORAGE_KEY, next ? 'open' : 'closed') } catch { /* ignore */ }
+      return next
+    })
+  }
 
   const handleOpen = (item) => {
     if (item.appId && onOpenApplication) {
@@ -131,70 +163,102 @@ export default function AttentionPanel({ items, counts, onOpenApplication }) {
         })}
       </div>
 
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <div>
-            <h2 className="font-display text-lg text-ink-900 leading-tight">Needs your attention</h2>
-            <p className="text-sm text-ink-500 mt-0.5">
-              {counts.critical > 0
-                ? `${counts.critical} thing${counts.critical > 1 ? 's' : ''} cannot wait.`
-                : 'Nothing urgent, but these are moving.'}
-            </p>
-          </div>
+      {/* The summary row is always visible, so collapsing hides the detail but
+          never the fact that something needs doing. */}
+      <button
+        onClick={toggle}
+        aria-expanded={open}
+        aria-controls="attention-items"
+        className="w-full flex items-center gap-3 p-4 sm:p-5 text-left
+                   hover:bg-ink-50/60 active:bg-ink-50
+                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset
+                   focus-visible:ring-ink-300 transition-colors duration-120"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="flex items-baseline gap-2 flex-wrap">
+            <span className="font-display text-lg text-ink-900 leading-tight">
+              Needs your attention
+            </span>
+            <span className="text-sm text-ink-400 tabular-nums">{items.length}</span>
+          </span>
+          <span className="block text-sm text-ink-500 mt-0.5">
+            {counts.critical > 0
+              ? `${counts.critical} thing${counts.critical > 1 ? 's' : ''} cannot wait.`
+              : 'Nothing urgent, but these are moving.'}
+          </span>
+        </span>
 
-          <div className="flex flex-wrap gap-1.5 justify-end shrink-0">
-            {counts.critical > 0 && (
-              <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ring-1', SEVERITY_META[SEVERITY.CRITICAL].chipClass)}>
-                <AlertTriangle size={11} aria-hidden="true" /> {counts.critical} urgent
-              </span>
-            )}
-            {counts.warning > 0 && (
-              <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ring-1', SEVERITY_META[SEVERITY.WARNING].chipClass)}>
-                {counts.warning} soon
-              </span>
-            )}
-            {counts.info > 0 && (
-              <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ring-1', SEVERITY_META[SEVERITY.INFO].chipClass)}>
-                {counts.info} to note
-              </span>
-            )}
-          </div>
-        </div>
+        <span className="flex flex-wrap gap-1.5 justify-end shrink-0">
+          {counts.critical > 0 && (
+            <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ring-1', SEVERITY_META[SEVERITY.CRITICAL].chipClass)}>
+              <AlertTriangle size={11} aria-hidden="true" /> {counts.critical}
+            </span>
+          )}
+          {counts.warning > 0 && (
+            <span className={cn('inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1', SEVERITY_META[SEVERITY.WARNING].chipClass)}>
+              {counts.warning}
+            </span>
+          )}
+          {counts.info > 0 && (
+            <span className={cn('inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1', SEVERITY_META[SEVERITY.INFO].chipClass)}>
+              {counts.info}
+            </span>
+          )}
+        </span>
 
-        <div className="space-y-0.5 -mx-1">
-          <AnimatePresence initial={false}>
-            {visible.map((item, i) => (
-              <AttentionRow key={item.id} item={item} index={i} onOpen={handleOpen} />
-            ))}
-          </AnimatePresence>
-        </div>
+        <ChevronDown
+          size={17}
+          className={cn('shrink-0 text-ink-400 transition-transform duration-200', open && 'rotate-180')}
+          aria-hidden="true"
+        />
+      </button>
 
-        {hidden > 0 && (
-          <button
-            onClick={() => setExpanded(true)}
-            className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg
-                       text-xs text-ink-500 hover:text-ink-800 hover:bg-ink-50
-                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-300
-                       transition-colors duration-120"
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            id="attention-items"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            className="overflow-hidden"
           >
-            <ChevronDown size={13} aria-hidden="true" />
-            Show {hidden} more
-          </button>
-        )}
+            <div className="px-4 sm:px-5 pb-5 pt-1 border-t border-ink-100">
+              <div className="space-y-0.5 -mx-1 mt-2">
+                {visible.map((item, i) => (
+                  <AttentionRow key={item.id} item={item} index={i} onOpen={handleOpen} />
+                ))}
+              </div>
 
-        {expanded && items.length > INITIAL_VISIBLE && (
-          <button
-            onClick={() => setExpanded(false)}
-            className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg
-                       text-xs text-ink-500 hover:text-ink-800 hover:bg-ink-50
-                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-300
-                       transition-colors duration-120"
-          >
-            <ChevronDown size={13} className="rotate-180" aria-hidden="true" />
-            Show less
-          </button>
+              {hidden > 0 && (
+                <button
+                  onClick={() => setExpanded(true)}
+                  className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg
+                             text-xs text-ink-500 hover:text-ink-800 hover:bg-ink-50
+                             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-300
+                             transition-colors duration-120"
+                >
+                  <ChevronDown size={13} aria-hidden="true" />
+                  Show {hidden} more
+                </button>
+              )}
+
+              {expanded && items.length > INITIAL_VISIBLE && (
+                <button
+                  onClick={() => setExpanded(false)}
+                  className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg
+                             text-xs text-ink-500 hover:text-ink-800 hover:bg-ink-50
+                             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-300
+                             transition-colors duration-120"
+                >
+                  <ChevronDown size={13} className="rotate-180" aria-hidden="true" />
+                  Show less
+                </button>
+              )}
+            </div>
+          </motion.div>
         )}
-      </div>
+      </AnimatePresence>
     </div>
   )
 }

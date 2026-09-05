@@ -168,14 +168,25 @@ export function UrgencyDot({ value, now, className }) {
 
 // ─── Country ─────────────────────────────────────────────────────────────────
 
+/**
+ * Country as a short code, with the full name in the tooltip.
+ *
+ * Deliberately no flag emoji. Windows has no flag glyphs, so Chromium falls
+ * back to rendering the underlying regional-indicator letters — which made the
+ * chip read "CH CH", "US US", "CA CA". A decoration that breaks on the user's
+ * own operating system is not worth the row it sits in.
+ */
 export function CountryChip({ code, className }) {
   const country = countryByCode(code)
   if (!country) return null
   return (
     <Tooltip label={country.name}>
-      <span className={cn('inline-flex items-center gap-1.5 text-xs text-ink-500', className)}>
-        <span aria-hidden="true">{country.flag}</span>
-        <span>{country.code === 'OTHER' ? 'Other' : country.code}</span>
+      <span className={cn(
+        'inline-flex items-center text-2xs font-medium tracking-wide',
+        'px-1.5 py-0.5 rounded-md bg-ink-100 text-ink-600',
+        className,
+      )}>
+        {country.code === 'OTHER' ? 'Other' : country.code}
       </span>
     </Tooltip>
   )

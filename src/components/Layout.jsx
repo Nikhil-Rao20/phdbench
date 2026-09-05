@@ -105,7 +105,7 @@ function MobileDock() {
       <div className="mx-auto max-w-md px-4 pb-4 pointer-events-auto">
         <div
           className="flex items-center justify-between gap-1 p-2
-                     rounded-3xl bg-ink-950/92 backdrop-blur-xl shadow-dock
+                     rounded-3xl bg-ink-950/95 backdrop-blur-xl shadow-dock
                      ring-1 ring-white/10"
         >
           {DOCK_NAV.map(({ to, icon: Icon, label }) => {
@@ -126,7 +126,7 @@ function MobileDock() {
                 {active && (
                   <motion.span
                     layoutId="dock-active"
-                    className="absolute inset-0 rounded-2xl bg-white/12"
+                    className="absolute inset-0 rounded-2xl bg-white/10"
                     transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 34 }}
                   />
                 )}
@@ -150,7 +150,7 @@ function MobileDock() {
                 <span
                   className={cn(
                     'relative z-10 text-[10px] leading-none transition-colors duration-150',
-                    active ? 'text-white font-medium' : 'text-ink-500',
+                    active ? 'text-white font-medium' : 'text-ink-400',
                   )}
                 >
                   {label}

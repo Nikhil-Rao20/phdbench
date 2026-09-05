@@ -119,14 +119,9 @@ export default function Dashboard() {
         />
       ) : (
         <>
-          {/* The most important thing on the page, so it comes first. */}
-          <AttentionPanel
-            items={attention}
-            counts={counts}
-            onOpenApplication={(id) => navigate(`/applications?open=${id}`)}
-          />
-
-          {/* Stats */}
+          {/* Stats lead. Opening the app to a wall of warnings every time is
+              punishing; the state of play comes first, and what needs doing sits
+              directly beneath it as a summary you can open. */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
               label="Active leads"
@@ -153,6 +148,12 @@ export default function Dashboard() {
               icon={Trophy} tone={offers.length ? 'success' : 'ink'} to="/applications" delay={0.15}
             />
           </div>
+
+          <AttentionPanel
+            items={attention}
+            counts={counts}
+            onOpenApplication={(id) => navigate(`/applications?open=${id}`)}
+          />
 
           <div className="grid lg:grid-cols-3 gap-6">
             {/* Upcoming deadlines */}

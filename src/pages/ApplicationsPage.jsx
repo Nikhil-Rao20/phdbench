@@ -51,17 +51,21 @@ function ApplicationCard({ app, documents, index, cycleTotalINR, onOpen, onEdit,
       {/* Migrated records say plainly that nothing was guessed about them. */}
       {app.needsReview && (
         <div
-          className="flex items-start gap-2 p-2.5 -m-1 mb-1 rounded-lg bg-sky-50 border border-sky-200"
+          className="p-2.5 -m-1 mb-1 rounded-lg bg-sky-50 border border-sky-200"
           onClick={e => e.stopPropagation()}
         >
-          <p className="text-xs text-sky-900 flex-1 leading-relaxed">
+          <p className="text-xs text-sky-900 leading-relaxed">
             Migrated from the old format — is this really <strong>{meta?.label}</strong>?
           </p>
+          {/* On its own line: side by side, the wrapping question stranded the
+              button in the middle of its own sentence. */}
           <button
             onClick={() => onConfirmReview(app)}
-            className="shrink-0 text-xs text-sky-700 font-medium hover:underline"
+            className="mt-1.5 inline-flex items-center gap-1 text-xs text-sky-700 font-medium
+                       hover:underline focus-visible:outline-none focus-visible:ring-2
+                       focus-visible:ring-sky-400 rounded"
           >
-            Yes
+            <CheckCircle2 size={12} aria-hidden="true" /> Yes, confirm
           </button>
         </div>
       )}
