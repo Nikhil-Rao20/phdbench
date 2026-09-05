@@ -252,12 +252,12 @@ export default function ApplicationDetailPanel({ appId, uid, onClose, onEdit }) 
                 <SectionTitle>Deadlines</SectionTitle>
                 <div className="space-y-3">
                   {[
-                    { label: 'Applications open', v: app.startDate },
+                    { label: 'Applications open', v: app.startDate, kind: 'opens' },
                     { label: 'Application', v: app.deadline },
                     { label: 'Recommendations', v: app.lorDeadline },
                     { label: 'Decision / reply by', v: app.expectedDecision },
                   ].filter(d => d.v).map(d => (
-                    <DeadlineDisplay key={d.label} value={d.v} label={d.label} />
+                    <DeadlineDisplay key={d.label} value={d.v} label={d.label} kind={d.kind} />
                   ))}
                   {!app.startDate && !app.deadline && !app.lorDeadline && !app.expectedDecision && (
                     <p className="text-xs text-ink-400">No dates set yet.</p>

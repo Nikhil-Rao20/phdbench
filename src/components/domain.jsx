@@ -82,7 +82,19 @@ const URGENCY_TONE = {
   [URGENCY.FUTURE]:   'sage',
 }
 
-export const toneForUrgency = (urgency) => URGENCY_TONE[urgency] || 'ink'
+/**
+ * `kind` matters because urgency is not the same thing as lateness.
+ *
+ * A deadline approaching is bad news and goes amber then rose. A date on which
+ * applications *open* approaching is good news, and rendering it in the warning
+ * colour tells the user something untrue. Charter #10: a colour means one thing.
+ */
+export const toneForUrgency = (urgency, kind = 'deadline') => {
+  if (kind === 'opens') {
+    return urgency === URGENCY.OVERDUE ? 'sage' : 'sky'
+  }
+  return URGENCY_TONE[urgency] || 'ink'
+}
 
 /**
  * A deadline, rendered honestly.
@@ -92,11 +104,11 @@ export const toneForUrgency = (urgency) => URGENCY_TONE[urgency] || 'ink'
  * only one of them is precisely how someone submits a day late while believing
  * they were a day early.
  */
-export function DeadlineDisplay({ value, label, now, compact = false, className }) {
+export function DeadlineDisplay({ value, label, now, kind = 'deadline', compact = false, className }) {
   const d = describeDeadline(value, now ? { now } : {})
   if (!d) return null
 
-  const tone = toneForUrgency(d.urgency)
+  const tone = toneForUrgency(d.urgency, kind)
   const t = toneOf(tone)
 
   if (compact) {
@@ -158,11 +170,11 @@ export function DeadlineDisplay({ value, label, now, compact = false, className 
 
 const shortZone = (tz) => (tz || '').split('/').pop()?.replace(/_/g, ' ') || ''
 
-export function UrgencyDot({ value, now, className }) {
+export function UrgencyDot({ value, now, kind = 'deadline', className }) {
   const d = describeDeadline(value, now ? { now } : {})
   if (!d) return null
-  const tone = toneForUrgency(d.urgency)
-  const critical = d.urgency === URGENCY.CRITICAL || d.urgency === URGENCY.TODAY
+  const tone = toneForUrgency(d.urgency, kind)
+  const critical = kind !== 'opens' && (d.urgency === URGENCY.CRITICAL || d.urgency === URGENCY.TODAY)
   return <Dot tone={tone} pulse={critical} className={className} />
 }
 

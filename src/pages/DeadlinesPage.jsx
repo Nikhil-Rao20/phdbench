@@ -20,7 +20,7 @@ const KINDS = {
 
 function DeadlineRow({ entry, index, onOpen }) {
   const { record, kind, d, isLead } = entry
-  const tone = toneForUrgency(d.urgency)
+  const tone = toneForUrgency(d.urgency, kind)
   const t = toneOf(tone)
 
   return (
@@ -38,7 +38,7 @@ function DeadlineRow({ entry, index, onOpen }) {
           d.overdue ? 'border-ink-200 opacity-70' : t.border,
         )}
       >
-        <UrgencyDot value={record[kindField(kind)]} />
+        <UrgencyDot value={record[kindField(kind)]} kind={kind === 'opens' ? 'opens' : 'deadline'} />
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -53,7 +53,7 @@ function DeadlineRow({ entry, index, onOpen }) {
         </div>
 
         <div className="text-right shrink-0 hidden sm:block">
-          <DeadlineDisplay value={record[kindField(kind)]} compact />
+          <DeadlineDisplay value={record[kindField(kind)]} kind={kind === 'opens' ? 'opens' : 'deadline'} compact />
           <p className="text-xs text-ink-400 mt-0.5">{d.schoolDate}</p>
           {d.crossesDay && (
             <p className="text-2xs text-sky-600">{d.homeDate} your time</p>
@@ -61,7 +61,7 @@ function DeadlineRow({ entry, index, onOpen }) {
         </div>
 
         <div className="sm:hidden text-right shrink-0">
-          <DeadlineDisplay value={record[kindField(kind)]} compact />
+          <DeadlineDisplay value={record[kindField(kind)]} kind={kind === 'opens' ? 'opens' : 'deadline'} compact />
         </div>
 
         {!isLead && <div className="hidden md:block shrink-0"><StageBadge stage={record.stage} short /></div>}

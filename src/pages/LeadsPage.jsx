@@ -79,9 +79,9 @@ function LeadCard({ lead, index, onEdit, onConvert, onArchive, onTriage }) {
         <div className="space-y-2 pt-1">
           {lead.startDate && !isOverdue(lead.startDate) && (
             <div className="flex items-center gap-2">
-              <UrgencyDot value={lead.startDate} />
+              <UrgencyDot value={lead.startDate} kind="opens" />
               <span className="text-xs text-ink-500">Opens</span>
-              <span className="ml-auto"><DeadlineDisplay value={lead.startDate} compact /></span>
+              <span className="ml-auto"><DeadlineDisplay value={lead.startDate} kind="opens" compact /></span>
             </div>
           )}
           {lead.deadline && <DeadlineDisplay value={lead.deadline} label="Deadline" />}
