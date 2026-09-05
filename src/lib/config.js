@@ -4,25 +4,18 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * ⚠️  CONFIRM THIS ADDRESS.
+ * The account that owns this data. Confirmed by the owner, 2026-09-05.
  *
  * PhDBench is a single-owner tool: only this Google account may sign in and read
- * or write the data. This value must match the account you actually sign in with.
+ * or write. The same address must appear in `firestore.rules` — that file is the
+ * real enforcement, and the two must never drift apart.
  *
- * It was inferred from the git history of this repository
- * (`Nikhil-Rao20 <nikhilproffesion@gmail.com>`), which is an educated guess, not
- * a verified fact — the Claude session reported a different address
- * (nikhil01446@gmail.com), so the two disagree.
- *
- * If this is wrong you are NOT locked out: signing in with a different account
- * shows a screen naming the address you used and pointing at this file. Change
- * the value here, and the same address in `firestore.rules`, and you are in.
- *
- * The real enforcement is in `firestore.rules`. This constant only controls the
- * UI, so a mismatch here is an inconvenience; a mismatch there is a lockout.
- * Publish the rules only once you have confirmed the address.
+ * A mismatch here is only an inconvenience: signing in with another account
+ * shows a screen naming the address used and pointing at this file. A mismatch
+ * in `firestore.rules` is a genuine lockout, fixable only from the Firebase
+ * console. Change both together.
  */
-export const OWNER_EMAIL = 'nikhilproffesion@gmail.com'
+export const OWNER_EMAIL = 'nikhil01446@gmail.com'
 
 /** Normalised comparison — Google addresses are case-insensitive. */
 export function isOwner(user) {

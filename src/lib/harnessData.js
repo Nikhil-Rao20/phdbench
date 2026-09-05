@@ -332,7 +332,10 @@ export function harnessData() {
 export const harnessUser = {
   uid: 'harness-user',
   displayName: 'Nikhil Rao',
-  email: 'nikhilproffesion@gmail.com',
+  // Deliberately a placeholder, not the real owner address: these fixtures
+  // render into the screenshots published in the README, and there is no reason
+  // to put a real email address in a public repository.
+  email: 'you@example.com',
   photoURL: null,
 }
 

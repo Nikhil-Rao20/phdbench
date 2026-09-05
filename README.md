@@ -140,9 +140,9 @@ PhDBench is locked to a single Google account. The address appears in **two** pl
 | `src/lib/config.js` | `OWNER_EMAIL` | The UI gate |
 | `firestore.rules` | `ownerEmail()` | The real enforcement |
 
-The current value was inferred from this repository's git history (`nikhilproffesion@gmail.com`) — an educated guess, not a verified fact.
+Both are set to `nikhil01446@gmail.com`, confirmed by the owner.
 
-Getting `config.js` wrong is a minor inconvenience: you land on a screen naming the address you signed in with and telling you which file to edit. **Getting `firestore.rules` wrong locks you out of your own data at the database layer**, and the only way back is the Firebase console. Check it before publishing.
+Getting `config.js` wrong is a minor inconvenience: you land on a screen naming the address you signed in with and telling you which file to edit. **Getting `firestore.rules` wrong locks you out of your own data at the database layer**, and the only way back is the Firebase console. Change both together.
 
 ### Publishing the rules
 
