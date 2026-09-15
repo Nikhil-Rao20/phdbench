@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { CalendarClock, CheckCircle2, Download, ChevronDown } from 'lucide-react'
 import { useData } from '../hooks/useData'
+import { useGroups } from '../hooks/useGroups'
 import { useToast } from '../hooks/useToast'
 import { describeDeadline, isOverdue, URGENCY } from '../lib/datetime'
 import { STAGES, isClosed } from '../lib/model'
@@ -75,7 +76,8 @@ const kindField = (kind) => ({
 }[kind])
 
 export default function DeadlinesPage() {
-  const { loading, applications, leads } = useData()
+  const { loading, applications } = useData()
+  const { leads, leadsLoading } = useGroups()
   const navigate = useNavigate()
   const toast = useToast()
   const [showPast, setShowPast] = useState(false)
@@ -93,7 +95,7 @@ export default function DeadlinesPage() {
       add(a, 'opens', false); add(a, 'deadline', false)
       add(a, 'lor', false); add(a, 'decision', false)
     })
-    leads.filter(l => (l.state || 'active') === 'active').forEach(l => {
+    leads.filter(l => (l.mine?.state || 'active') === 'active').forEach(l => {
       add(l, 'opens', true); add(l, 'deadline', true)
     })
 
@@ -116,7 +118,7 @@ export default function DeadlinesPage() {
     toast.success('Calendar file downloaded. Import it into Google Calendar to get reminders.')
   }
 
-  if (loading) {
+  if (loading || leadsLoading) {
     return (
       <div className="space-y-6">
         <div className="h-8 w-40 bg-ink-100 rounded-lg animate-shimmer" />

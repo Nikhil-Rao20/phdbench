@@ -6,6 +6,7 @@ import {
 } from 'recharts'
 import { BarChart3, Info } from 'lucide-react'
 import { useData } from '../hooks/useData'
+import { useGroups } from '../hooks/useGroups'
 import {
   submittedApplications, preparingApplications, responseRate,
   emailReplyRate, docsProgress,
@@ -78,7 +79,8 @@ function Panel({ title, children, delay = 0, className }) {
 }
 
 export default function StatsPage() {
-  const { loading, applications, leads, documents } = useData()
+  const { loading, applications, documents } = useData()
+  const { leads } = useGroups()
 
   const sent = submittedApplications(applications)
   const preparing = preparingApplications(applications)
@@ -186,7 +188,7 @@ export default function StatsPage() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Leads saved" value={leads.length}
-          context={`${leads.filter(l => (l.state || 'active') === 'active').length} still active`} delay={0} />
+          context={`${leads.filter(l => (l.mine?.state || 'active') === 'active').length} still active`} delay={0} />
         <StatCard label="Submitted" value={sent.length}
           context={preparing.length ? `${preparing.length} still in preparation` : 'nothing in the drawer'}
           note="Counts applications at Submitted, Under review, Interview, Offer, Waitlist, Rejected, Withdrawn or Missed."

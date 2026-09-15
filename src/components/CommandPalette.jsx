@@ -16,6 +16,7 @@ import {
   LayoutDashboard, CalendarClock, BarChart3, Settings, Archive, Plus,
 } from 'lucide-react'
 import { useData } from '../hooks/useData'
+import { useGroups } from '../hooks/useGroups'
 import { STAGES, LEAD_STATES } from '../lib/model'
 import { cn } from './ui'
 
@@ -42,7 +43,8 @@ function score(haystack, query) {
 
 export default function CommandPalette() {
   const navigate = useNavigate()
-  const { applications, leads } = useData()
+  const { applications } = useData()
+  const { leads } = useGroups()
 
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')

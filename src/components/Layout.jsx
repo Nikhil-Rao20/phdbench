@@ -3,9 +3,11 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import {
   LayoutDashboard, Lightbulb, FileText, CalendarClock,
-  BarChart3, Settings, Search,
+  BarChart3, Settings, Search, ShieldCheck, Users,
 } from 'lucide-react'
 import ProfileDropdown, { Avatar } from './ProfileDropdown'
+import GroupSwitcher from './GroupSwitcher'
+import { useAccess } from '../hooks/useAccess'
 import { useAuth } from '../hooks/useAuth'
 import { cn, Tooltip } from './ui'
 
@@ -25,7 +27,8 @@ const BRAND_LOGO = `${import.meta.env.BASE_URL}NikhilRao.png`
 
 // ─── Desktop sidebar ─────────────────────────────────────────────────────────
 
-function Sidebar() {
+function Sidebar({ onNavigate }) {
+  const { admin } = useAccess()
   return (
     <div className="flex flex-col h-full bg-ink-950 text-white p-4">
       <div className="flex items-center gap-3 px-2 py-3 mb-6">
@@ -40,8 +43,10 @@ function Sidebar() {
         </div>
       </div>
 
+      <GroupSwitcher />
+
       <nav className="flex-1 space-y-1" aria-label="Main">
-        {NAV.map(({ to, icon: Icon, label }) => (
+        {[...NAV, ...(admin ? [{ to: '/admin', icon: ShieldCheck, label: 'Access' }] : [])].map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}

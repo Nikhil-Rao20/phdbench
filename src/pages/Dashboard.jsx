@@ -6,6 +6,7 @@ import {
   CalendarClock, Plus, Wallet,
 } from 'lucide-react'
 import { useData } from '../hooks/useData'
+import { useGroups } from '../hooks/useGroups'
 import { useAuth } from '../hooks/useAuth'
 import { computeAttention, attentionCounts } from '../lib/attention'
 import { submittedApplications, preparingApplications, responseRate } from '../lib/derive'
@@ -56,7 +57,9 @@ function StatCard({ label, value, sub, icon: Icon, tone = 'ink', to, delay = 0 }
 
 export default function Dashboard() {
   const { user } = useAuth()
-  const { loading, applications, leads, documents, profile } = useData()
+  const { loading, applications, documents, profile } = useData()
+  // Leads are the group's, not the account's.
+  const { leads, leadsLoading } = useGroups()
   const navigate = useNavigate()
 
   const attention = useMemo(
@@ -80,7 +83,7 @@ export default function Dashboard() {
       if (d) entries.push({ record, kind, d })
     }
     applications.forEach(a => push(a, 'application'))
-    leads.filter(l => (l.state || 'active') === 'active').forEach(l => push(l, 'lead'))
+    leads.filter(l => (l.mine?.state || 'active') === 'active').forEach(l => push(l, 'lead'))
     return entries.sort((a, b) => a.d.instant - b.d.instant).slice(0, 6)
   }, [applications, leads])
 
@@ -89,7 +92,7 @@ export default function Dashboard() {
     [applications],
   )
 
-  if (loading) return <PageSkeleton />
+  if (loading || leadsLoading) return <PageSkeleton />
 
   const firstName = profile?.displayName || user?.displayName?.split(' ')[0] || 'there'
   const isEmpty = applications.length === 0 && leads.length === 0
@@ -125,7 +128,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
               label="Active leads"
-              value={leads.filter(l => (l.state || 'active') === 'active').length}
+              value={leads.filter(l => (l.mine?.state || 'active') === 'active').length}
               sub={`${leads.length} saved in total`}
               icon={Lightbulb} tone="sky" to="/leads" delay={0}
             />

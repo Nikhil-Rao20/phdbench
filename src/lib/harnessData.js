@@ -365,3 +365,71 @@ export const harnessSubcollections = {
     ],
   },
 }
+
+// ─── Shared groups (harness) ─────────────────────────────────────────────────
+// The screenshot runner needs a group and a shared board that exercises the
+// per-person state: leads the fixture user converted, ruled out, and never
+// touched, plus leads added by other members.
+
+const HARNESS_UID = 'harness-user'
+const MATE_A = 'uid-rahul'
+const MATE_B = 'uid-priya'
+
+export const harnessGroups = () => ([
+  {
+    id: 'group-core',
+    name: 'RGUKT PhD hunt',
+    createdBy: HARNESS_UID,
+    createdByEmail: 'you@example.com',
+    memberEmails: ['you@example.com', 'rahul@example.com', 'priya@example.com'],
+    members: {
+      [HARNESS_UID]: { role: 'admin',  email: 'you@example.com',   name: 'Nikhil' },
+      [MATE_A]:      { role: 'member', email: 'rahul@example.com', name: 'Rahul' },
+      [MATE_B]:      { role: 'member', email: 'priya@example.com', name: 'Priya' },
+    },
+    createdAt: ts(40),
+  },
+  {
+    id: 'group-cv',
+    name: 'Vision labs watch',
+    createdBy: MATE_A,
+    createdByEmail: 'rahul@example.com',
+    memberEmails: ['you@example.com', 'rahul@example.com'],
+    members: {
+      [HARNESS_UID]: { role: 'member', email: 'you@example.com',   name: 'Nikhil' },
+      [MATE_A]:      { role: 'admin',  email: 'rahul@example.com', name: 'Rahul' },
+    },
+    createdAt: ts(12),
+  },
+])
+
+/** The private leads reshaped as shared ones, with per-person opinions. */
+export const harnessGroupLeads = () => leads.map((lead, i) => {
+  const { state, priority, fitScore, archivedAt, ...shared } = lead
+
+  // Rotate authorship so attribution and the "others applied" marker are both
+  // visible in a screenshot.
+  const authors = [
+    { uid: HARNESS_UID, name: 'Nikhil', email: 'you@example.com' },
+    { uid: MATE_A, name: 'Rahul', email: 'rahul@example.com' },
+    { uid: MATE_B, name: 'Priya', email: 'priya@example.com' },
+  ]
+  const author = authors[i % authors.length]
+
+  const states = {
+    [HARNESS_UID]: { state: state || 'active', priority, fitScore, archivedAt: archivedAt || null },
+  }
+  // A teammate has applied to a couple of them, so the counter has something
+  // real to show.
+  if (i % 4 === 0) states[MATE_A] = { state: 'converted', archivedAt: null }
+  if (i % 5 === 0) states[MATE_B] = { state: 'active', archivedAt: null }
+
+  return {
+    ...shared,
+    addedBy: author.uid,
+    addedByName: author.name,
+    addedByEmail: author.email,
+    states,
+    schemaVersion: 3,
+  }
+})

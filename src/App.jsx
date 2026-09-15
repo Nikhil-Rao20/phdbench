@@ -3,10 +3,12 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useAuth } from './hooks/useAuth'
 import { DataProvider } from './hooks/useData'
+import { GroupsProvider } from './hooks/useGroups'
 import LoginPage from './pages/LoginPage'
 import Layout from './components/Layout'
 import SEOManager from './components/SEOManager'
-import NotAuthorized from './components/NotAuthorized'
+import { useAccess } from './hooks/useAccess'
+import { ACCESS } from './lib/access'
 import { PageSkeleton } from './components/Skeleton'
 import CommandPalette from './components/CommandPalette'
 import Dashboard from './pages/Dashboard'
@@ -18,10 +20,29 @@ const StatsPage = lazy(() => import('./pages/StatsPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const ArchivePage = lazy(() => import('./pages/ArchivePage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
+const RequestAccessPage = lazy(() => import('./pages/RequestAccessPage'))
+const AdminPage = lazy(() => import('./pages/AdminPage'))
+const GroupsPage = lazy(() => import('./pages/GroupsPage'))
 
 const TRANSITION_DURATION_MS = 2200
 
-function LoginSuccessOverlay({ show, onDone }) {
+/**
+ * The welcome flourish.
+ *
+ * The name comes from the signed-in Google account, so everyone sees their own
+ * rather than the author's. A missing displayName is normal — some Google
+ * accounts have none — so it falls back to the email local part and finally to
+ * a neutral greeting, never to an empty screen.
+ */
+function LoginSuccessOverlay({ show, onDone, user }) {
+  const raw = (user?.displayName || '').trim()
+  const fallback = (user?.email || '').split('@')[0].replace(/[._-]+/g, ' ').trim()
+  const full = raw || fallback || 'Welcome'
+
+  // Beyond about 22 characters even the smallest size stops feeling like a
+  // flourish, so a very long name is reduced to its first two parts.
+  const displayName = full.length > 22 ? full.split(/\s+/).slice(0, 2).join(' ') : full
+
   useEffect(() => {
     if (!show) return undefined
     const timer = setTimeout(onDone, TRANSITION_DURATION_MS)
@@ -51,14 +72,19 @@ function LoginSuccessOverlay({ show, onDone }) {
                 filter: 'blur(6px)',
               }}
             />
-            <div className="relative flex flex-col items-center gap-6">
+            <div className="relative flex flex-col items-center gap-6 px-6 max-w-full">
               <h1
-                className="font-display text-[clamp(56px,12vw,180px)] tracking-[0.16em] text-transparent bg-clip-text"
+                className="font-display tracking-[0.16em] text-transparent bg-clip-text
+                           text-center max-w-full break-words"
                 style={{
                   backgroundImage: 'linear-gradient(120deg, #1a1914 0%, #448d65 45%, #1a1914 100%)',
+                  // Scales with the name's own length as well as the viewport, so
+                  // "Nikhil" fills the screen and "Venkata Sai Krishna Prasad"
+                  // still lands on one line instead of overflowing it.
+                  fontSize: `clamp(34px, ${Math.min(12, 150 / Math.max(displayName.length, 6))}vw, 180px)`,
                 }}
               >
-                Nikhil Rao
+                {displayName}
               </h1>
               <motion.div
                 className="text-xs uppercase tracking-[0.35em] text-ink-400"
@@ -78,7 +104,8 @@ function LoginSuccessOverlay({ show, onDone }) {
 }
 
 export default function App() {
-  const { user, isImpostor } = useAuth()
+  const { user } = useAuth()
+  const { state: accessStatus, loading: accessLoading, admin } = useAccess()
   const [showLoginTransition, setShowLoginTransition] = useState(false)
   const authStatusRef = useRef('unknown')
 
@@ -106,12 +133,19 @@ export default function App() {
     )
   }
 
-  // Signed in with the wrong account.
-  if (isImpostor) {
+
+  // Signed in, but the approval answer has not arrived yet. Showing the app
+  // here would flash real screens at someone who may not be allowed in.
+  if (user && accessLoading && !showLoginTransition) {
     return (
       <>
         <SEOManager isAuthenticated={false} />
-        <NotAuthorized />
+        <div className="min-h-screen flex items-center justify-center bg-ink-50">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-8 h-8 border-2 border-ink-200 border-t-ink-900 rounded-full animate-spin" />
+            <p className="text-sm text-ink-400">Checking your access…</p>
+          </div>
+        </div>
       </>
     )
   }
@@ -128,13 +162,28 @@ export default function App() {
         <LoginSuccessOverlay
           show={showLoginTransition}
           onDone={() => setShowLoginTransition(false)}
+          user={user}
         />
+      </>
+    )
+  }
+
+  // Signed in but not approved: the request, pending and refused states all
+  // live behind this one screen.
+  if (accessStatus !== ACCESS.APPROVED) {
+    return (
+      <>
+        <SEOManager isAuthenticated={false} />
+        <Suspense fallback={<PageSkeleton />}>
+          <RequestAccessPage />
+        </Suspense>
       </>
     )
   }
 
   return (
     <DataProvider>
+      <GroupsProvider>
       <SEOManager isAuthenticated />
       <CommandPalette />
       <Layout>
@@ -146,13 +195,16 @@ export default function App() {
             <Route path="/deadlines"    element={<DeadlinesPage />} />
             <Route path="/stats"        element={<StatsPage />} />
             <Route path="/settings"     element={<SettingsPage />} />
+            <Route path="/groups"       element={<GroupsPage />} />
             <Route path="/archive"      element={<ArchivePage />} />
+            {admin && <Route path="/admin" element={<AdminPage />} />}
             {/* A wrong URL used to silently redirect to the dashboard, which
                 hides typos and broken links. It now says what happened. */}
             <Route path="*"             element={<NotFoundPage />} />
           </Routes>
         </Suspense>
       </Layout>
+      </GroupsProvider>
     </DataProvider>
   )
 }

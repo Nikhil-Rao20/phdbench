@@ -192,7 +192,9 @@ export function computeAttention({ applications = [], leads = [], documents = []
 
   // ── Leads ─────────────────────────────────────────────────────────────────
   for (const lead of leads) {
-    if (lead.state && lead.state !== 'active') continue
+    // Personal state on a shared lead: what *this* person decided about it.
+    const leadState = lead.mine?.state || lead.state || 'active'
+    if (leadState !== 'active') continue
 
     if (lead.deadline) {
       const days = daysUntil(lead.deadline, opts)

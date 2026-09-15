@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { AuthProvider } from './hooks/useAuth'
+import { AccessProvider } from './hooks/useAccess'
 import { ToastProvider } from './hooks/useToast'
 import Toaster from './components/Toaster'
 import ConnectionStatus from './components/ConnectionStatus'
@@ -33,7 +34,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <BrowserRouter basename="/phdbench">
         <ToastProvider>
           <AuthProvider>
-            <App />
+            <AccessProvider>
+              <App />
+            </AccessProvider>
             <Toaster />
             <ConnectionStatus />
           </AuthProvider>
