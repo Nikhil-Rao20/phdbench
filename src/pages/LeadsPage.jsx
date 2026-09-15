@@ -24,7 +24,7 @@ import {
   archiveLeadForMe, restoreLeadForMe, convertSharedLead, destroySharedLead,
 } from '../lib/groupsDb'
 import { LEAD_STATE, STAGE } from '../lib/model'
-import { appliedCount, isGroupAdmin, canDestroyLead } from '../lib/access'
+import { appliedCount, isGroupAdmin, withinLimit, limitMessage, LIMITS } from '../lib/access'
 import { isOverdue } from '../lib/datetime'
 import { singleLine } from '../lib/safety'
 import Modal from '../components/Modal'
@@ -303,6 +303,10 @@ export default function LeadsPage() {
   const uid = user?.uid
   const canDestroy = active ? isGroupAdmin(active, user) : false
 
+  // The cap the rules also enforce, surfaced before the write rather than after.
+  const atLimit = !withinLimit(user, 'leads', leads.length)
+  const limitNote = limitMessage('leads', leads.length)
+
   const sentinelRef = useInfiniteScroll({
     onLoadMore: loadMore,
     enabled: !exhausted && !leadsLoading,
@@ -421,8 +425,11 @@ export default function LeadsPage() {
             ) : 'Loading…'}
           </p>
         </div>
-        <Button variant="primary" icon={Plus} onClick={() => setAddOpen(true)} disabled={!active}
-          disabledReason="Pick a group first.">
+        <Button variant="primary" icon={Plus} onClick={() => setAddOpen(true)}
+          disabled={!active || atLimit}
+          disabledReason={atLimit
+            ? `You have reached the limit of ${LIMITS.leads} leads. Archive some you no longer need.`
+            : 'Pick a group first.'}>
           Save new lead
         </Button>
       </div>

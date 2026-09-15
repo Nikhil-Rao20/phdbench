@@ -22,6 +22,12 @@ import {
   DocsProgress, LorSummary, FeeDisplay, feeInINR,
 } from '../components/domain'
 import { Input, Select } from '../components/form'
+import { useInfiniteScroll } from '../hooks/useInfiniteScroll'
+import { withinLimit, limitMessage, LIMITS } from '../lib/access'
+import { useAuth } from '../hooks/useAuth'
+
+/** Cards rendered per batch. */
+const PAGE = 25
 
 const GROUPS = [
   { value: 'all',       label: 'All' },
@@ -135,6 +141,7 @@ function ApplicationCard({ app, documents, index, cycleTotalINR, onOpen, onEdit,
 
 export default function ApplicationsPage() {
   const uid = useUid()
+  const { user } = useAuth()
   const { loading, applications, documents } = useData()
   const toast = useToast()
   const mutate = useMutation()
@@ -199,6 +206,21 @@ export default function ApplicationsPage() {
       })
   }, [applications, group, stageFilter, search, sort])
 
+  // How many cards are actually in the DOM. Reset whenever the filters change,
+  // so narrowing a search does not leave a stale page's worth showing.
+  const [renderCount, setRenderCount] = useState(PAGE)
+  useEffect(() => { setRenderCount(PAGE) }, [search, group, stageFilter, sort])
+
+  const visible = filtered.slice(0, renderCount)
+  const hasMore = filtered.length > visible.length
+  const showMore = () => setRenderCount(c => c + PAGE)
+  const moreRef = useInfiniteScroll({ onLoadMore: showMore, enabled: hasMore })
+
+  // The cap the rules also enforce. Checked here so the button explains itself
+  // rather than the write simply failing.
+  const atLimit = !withinLimit(user, 'applications', applications.length)
+  const limitNote = limitMessage('applications', applications.length)
+
   const handleAdd = async (data) => {
     setSaving(true)
     const r = await mutate(() => addApplication(uid, data), {
@@ -246,8 +268,17 @@ export default function ApplicationsPage() {
           <p className="text-ink-500 text-sm mt-1">
             {preparingCount} in preparation · {sentCount} sent · {applications.length} total
           </p>
+          {/* Only appears as the cap approaches — a limit you will never reach
+              is noise, and one you are about to hit is worth warning about. */}
+          {limitNote && (
+            <p className={cn('text-xs mt-1', atLimit ? 'text-rose-600' : 'text-amber-700')}>
+              {limitNote}
+            </p>
+          )}
         </div>
-        <Button variant="primary" icon={Plus} onClick={() => setAddOpen(true)}>
+        <Button variant="primary" icon={Plus} onClick={() => setAddOpen(true)}
+          disabled={atLimit}
+          disabledReason={`You have reached the limit of ${LIMITS.applications} applications. Archive some you no longer need.`}>
           Add application
         </Button>
       </div>
@@ -322,23 +353,36 @@ export default function ApplicationsPage() {
           }
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          <AnimatePresence mode="popLayout">
-            {filtered.map((app, i) => (
-              <ApplicationCard
-                key={app.id}
-                app={app}
-                documents={documents}
-                index={i}
-                cycleTotalINR={cycleTotalINR}
-                onOpen={setOpenId}
-                onEdit={setEditTarget}
-                onArchive={handleArchive}
-                onConfirmReview={handleConfirmReview}
-              />
-            ))}
-          </AnimatePresence>
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <AnimatePresence mode="popLayout">
+              {visible.map((app, i) => (
+                <ApplicationCard
+                  key={app.id}
+                  app={app}
+                  documents={documents}
+                  index={i}
+                  cycleTotalINR={cycleTotalINR}
+                  onOpen={setOpenId}
+                  onEdit={setEditTarget}
+                  onArchive={handleArchive}
+                  onConfirmReview={handleConfirmReview}
+                />
+              ))}
+            </AnimatePresence>
+          </div>
+
+          {/* Rendered incrementally rather than all at once. Five hundred cards
+              is a great deal of DOM, and most of it is below the fold and never
+              looked at — the scroll stutters long before the data does. */}
+          {hasMore && (
+            <div ref={moreRef} className="flex justify-center py-6">
+              <Button variant="ghost" onClick={showMore}>
+                Show more ({filtered.length - visible.length} left)
+              </Button>
+            </div>
+          )}
+        </>
       )}
 
       {openId && (
