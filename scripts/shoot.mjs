@@ -35,6 +35,9 @@ const ROUTES = [
   { name: 'settings',     path: '/settings' },
   { name: 'archive',      path: '/archive' },
   { name: 'not-found',    path: '/does-not-exist' },
+  // Photographed with the dialog open, so the overlay's layering is verified
+  // and not merely assumed.
+  { name: 'modal-open',   path: '/leads', openModal: /save new lead/i },
   // The slide-in detail panel, opened by URL.
   { name: 'detail-panel', path: '/applications?open=app-mit' },
 ]
@@ -114,6 +117,11 @@ async function main() {
           await page.goto(`${BASE}${route.path}`, { waitUntil: 'networkidle', timeout: 20000 })
           // Let entry animations settle so shots are not caught mid-transition.
           await page.waitForTimeout(900)
+
+          if (route.openModal) {
+            await page.getByRole('button', { name: route.openModal }).first().click()
+            await page.waitForTimeout(700)
+          }
 
           await page.screenshot({
             path: path.join(OUT, `${label}.png`),

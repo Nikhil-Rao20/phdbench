@@ -143,6 +143,16 @@ export default function ApplicationsPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
   const [saving, setSaving] = useState(false)
+  // Whether each open form has actually been edited, so an untouched one
+  // closes on a backdrop click without asking.
+  const [addDirty, setAddDirty] = useState(false)
+  const [editDirty, setEditDirty] = useState(false)
+
+  // Reset when a form closes, by any route — cancel, backdrop, discard or a
+  // successful save. Without this a discarded edit leaves the flag set, and the
+  // next time the form opens it warns about changes that no longer exist.
+  useEffect(() => { if (!addOpen) setAddDirty(false) }, [addOpen])
+  useEffect(() => { if (!editTarget) setEditDirty(false) }, [editTarget])
   const [search, setSearch] = useState('')
   const [group, setGroup] = useState('all')
   const [stageFilter, setStageFilter] = useState('')
@@ -344,17 +354,18 @@ export default function ApplicationsPage() {
         />
       )}
 
-      <Modal open={addOpen} onClose={() => setAddOpen(false)} wide confirmClose
+      <Modal open={addOpen} onClose={() => setAddOpen(false)} wide isDirty={addDirty}
         title="Add an application"
         description="It starts as “Not started” — mark it submitted only once it has actually gone.">
-        <ApplicationForm onSubmit={handleAdd} onCancel={() => setAddOpen(false)} loading={saving} />
+        <ApplicationForm onSubmit={handleAdd} onCancel={() => setAddOpen(false)}
+          onDirtyChange={setAddDirty} loading={saving} />
       </Modal>
 
-      <Modal open={!!editTarget} onClose={() => setEditTarget(null)} wide confirmClose
+      <Modal open={!!editTarget} onClose={() => setEditTarget(null)} wide isDirty={editDirty}
         title="Edit application">
         {editTarget && (
           <ApplicationForm initial={editTarget} onSubmit={handleEdit}
-            onCancel={() => setEditTarget(null)} loading={saving} />
+            onCancel={() => setEditTarget(null)} onDirtyChange={setEditDirty} loading={saving} />
         )}
       </Modal>
     </div>

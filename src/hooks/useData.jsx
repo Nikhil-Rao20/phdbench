@@ -12,7 +12,7 @@
 // edits appear immediately even before the server confirms them.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useAuth } from './useAuth'
 import { useToast, describeError } from './useToast'
 import {
@@ -26,68 +26,97 @@ const DataContext = createContext(null)
 
 const EMPTY = { leads: [], applications: [], documents: [], profile: null }
 
+const ALL_PENDING = { leads: false, applications: false, documents: false, profile: false }
+const ALL_READY   = { leads: true,  applications: true,  documents: true,  profile: true  }
+
 export function DataProvider({ children }) {
   const { user } = useAuth()
   const toast = useToast()
 
   const [raw, setRaw] = useState(EMPTY)
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   // Each collection reports its own first load; the app is "ready" only when
   // all of them have. Rendering a dashboard from half-arrived data shows wrong
   // counts for a moment, which reads as data loss.
-  const [ready, setReady] = useState({ leads: false, applications: false, documents: false, profile: false })
+  const [ready, setReady] = useState(ALL_PENDING)
+
+  // Held in a ref and kept out of the dependency array below.
+  //
+  // `toast` is stable now, but this effect owns four live Firestore
+  // subscriptions: re-running it is expensive and was the mechanism of a bug
+  // that left the app permanently spinning. A ref means no future change to the
+  // toast module — or anything else read in here — can resurrect that.
+  const toastRef = useRef(toast)
+  useEffect(() => { toastRef.current = toast }, [toast])
+
+  const uid = UI_HARNESS ? 'harness' : user?.uid || null
 
   useEffect(() => {
     if (UI_HARNESS) {
       setRaw(harnessData())
-      setReady({ leads: true, applications: true, documents: true, profile: true })
-      setLoading(false)
+      setReady(ALL_READY)
       return undefined
     }
 
-    if (!user) {
+    if (!uid) {
       setRaw(EMPTY)
-      setLoading(false)
+      setReady(ALL_READY)
       return undefined
     }
 
-    setLoading(true)
+    // Re-subscribing means the data is genuinely unknown again, so readiness
+    // resets with it. Previously it did not, which is why `loading` could be set
+    // true and then never cleared.
+    setReady(ALL_PENDING)
     setError(null)
 
     const markReady = (key) => setReady(r => (r[key] ? r : { ...r, [key]: true }))
 
     const onError = (key) => (err) => {
       setError(err)
+      // Mark ready even on failure. An error is a finished outcome; leaving the
+      // key pending would hang the whole app behind a spinner forever.
       markReady(key)
-      toast.error(describeError(err, `Could not load your ${key}.`), { key: `load-${key}` })
+      toastRef.current.error(describeError(err, `Could not load your ${key}.`), { key: `load-${key}` })
     }
 
     const unsubs = [
-      subscribeLeads(user.uid, (data) => { setRaw(s => ({ ...s, leads: data })); markReady('leads') }, onError('leads')),
-      subscribeApplications(user.uid, (data) => { setRaw(s => ({ ...s, applications: data })); markReady('applications') }, onError('applications')),
-      subscribeDocuments(user.uid, (data) => { setRaw(s => ({ ...s, documents: data })); markReady('documents') }, onError('documents')),
-      subscribeProfile(user.uid, (data) => { setRaw(s => ({ ...s, profile: data })); markReady('profile') }, onError('profile')),
+      subscribeLeads(uid, (data) => { setRaw(s => ({ ...s, leads: data })); markReady('leads') }, onError('leads')),
+      subscribeApplications(uid, (data) => { setRaw(s => ({ ...s, applications: data })); markReady('applications') }, onError('applications')),
+      subscribeDocuments(uid, (data) => { setRaw(s => ({ ...s, documents: data })); markReady('documents') }, onError('documents')),
+      subscribeProfile(uid, (data) => { setRaw(s => ({ ...s, profile: data })); markReady('profile') }, onError('profile')),
     ]
 
     return () => unsubs.forEach(fn => fn?.())
-  }, [user, toast])
+  }, [uid])
 
-  useEffect(() => {
-    if (Object.values(ready).every(Boolean)) setLoading(false)
-  }, [ready])
+  // Derived, not stored. A separate `loading` flag could fall out of step with
+  // the thing it describes — and did.
+  const loading = !Object.values(ready).every(Boolean)
 
   // Seed the document checklist the first time an account is used. This is the
   // call the previous version was missing entirely, which left new accounts with
   // an empty checklist and no obvious way to fill it.
+  // Guarded by a ref, not only by the document count.
+  //
+  // `ensureDefaultDocuments` reads then writes, so two overlapping calls would
+  // both see an empty collection and both commit a full set — twelve documents
+  // become twenty-four. The subscription has not delivered yet at first run, so
+  // the count check alone cannot prevent that; React StrictMode double-invoking
+  // effects in development is enough to trigger it.
+  const seedingRef = useRef(false)
+
   useEffect(() => {
     if (UI_HARNESS || !user || !ready.documents) return
-    if (raw.documents.length > 0) return
+    if (raw.documents.length > 0 || seedingRef.current) return
+
+    seedingRef.current = true
     ensureDefaultDocuments(user.uid).catch(err => {
-      toast.error(describeError(err, 'Could not set up your document checklist.'))
+      seedingRef.current = false // Let a genuine failure be retried.
+      toastRef.current.error(describeError(err, 'Could not set up your document checklist.'))
     })
-  }, [user, ready.documents, raw.documents.length, toast])
+  }, [user, ready.documents, raw.documents.length])
 
   const value = useMemo(() => ({
     loading,

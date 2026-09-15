@@ -13,7 +13,26 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 
-const ToastContext = createContext(null)
+/**
+ * Two contexts, deliberately.
+ *
+ * The API (push / dismiss / success / error …) must be referentially STABLE for
+ * the life of the app, because consumers put it in `useEffect` dependency
+ * arrays. The toast *list* changes constantly — every appearance and every
+ * auto-dismiss.
+ *
+ * Holding both in one context value caused a real bug: the value was rebuilt on
+ * every toast, which re-ran `DataProvider`'s subscription effect, tore down all
+ * four Firestore listeners and set `loading` back to true — where it stuck,
+ * because the effect that clears it watches `ready`, which never changed. Every
+ * successful save therefore left the app spinning with the data hidden until a
+ * manual reload.
+ *
+ * Splitting them means `useToast()` returns the same object forever, and only
+ * the Toaster re-renders when the list changes.
+ */
+const ToastApiContext = createContext(null)
+const ToastListContext = createContext([])
 
 const DEFAULT_DURATION = 4000
 const UNDO_DURATION = 8000 // Long enough to notice and react, short enough not to nag.
@@ -64,8 +83,10 @@ export function ToastProvider({ children }) {
     }
   }, [])
 
+  // `push` and `dismiss` are themselves stable, so this object is created once
+  // and never again. Note the absence of `toasts` — including it here is exactly
+  // what broke the app before.
   const api = useMemo(() => ({
-    toasts,
     dismiss,
     /** Something worked. Short, quiet, self-dismissing. */
     success: (message, options = {}) => push({ tone: 'success', message, ...options }),
@@ -75,17 +96,32 @@ export function ToastProvider({ children }) {
     /** Neutral confirmation of a reversible action, with the reversal attached. */
     undo: (message, onUndo, options = {}) => push({ tone: 'undo', message, onUndo, ...options }),
     push,
-  }), [toasts, push, dismiss])
+  }), [push, dismiss])
 
-  return <ToastContext.Provider value={api}>{children}</ToastContext.Provider>
+  return (
+    <ToastApiContext.Provider value={api}>
+      <ToastListContext.Provider value={toasts}>
+        {children}
+      </ToastListContext.Provider>
+    </ToastApiContext.Provider>
+  )
 }
 
+/**
+ * The toast API. Safe to place in a dependency array — this reference never
+ * changes for the lifetime of the provider.
+ */
 export function useToast() {
-  const ctx = useContext(ToastContext)
+  const ctx = useContext(ToastApiContext)
   if (!ctx) {
     throw new Error('useToast must be used inside a ToastProvider')
   }
   return ctx
+}
+
+/** The live toast list. For the Toaster only — it re-renders on every change. */
+export function useToastList() {
+  return useContext(ToastListContext)
 }
 
 /**

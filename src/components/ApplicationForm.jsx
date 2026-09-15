@@ -15,6 +15,7 @@ import {
   Segmented, Checkbox, DeadlineInput,
 } from './form'
 import { Button, SectionTitle, Progress, Tooltip, cn } from './ui'
+import { useDirty } from '../hooks/useDirty'
 
 const PRIORITY_OPTIONS = [
   { value: PRIORITY.DREAM,  label: 'Dream',  icon: Star },
@@ -28,7 +29,7 @@ const TYPE_OPTIONS = [
   { value: 'both',   label: 'Both',   icon: Shuffle },
 ]
 
-export default function ApplicationForm({ initial = {}, onSubmit, onCancel, loading }) {
+export default function ApplicationForm({ initial = {}, onSubmit, onCancel, onDirtyChange, loading }) {
   const { applications, leads, documents, profile } = useData()
   const entities = useMemo(() => knownEntities(applications, leads), [applications, leads])
   const recommenders = profile?.recommenders || []
@@ -78,6 +79,9 @@ export default function ApplicationForm({ initial = {}, onSubmit, onCancel, load
 
   const [touched, setTouched] = useState(false)
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  // Only an actually-edited form warns before closing.
+  useDirty(form, onDirtyChange)
   const setFee = (k, v) => setForm(f => ({ ...f, fee: { ...f.fee, [k]: v } }))
 
   // Picking a country supplies the currency, so it is one less thing to answer.
@@ -480,7 +484,11 @@ export default function ApplicationForm({ initial = {}, onSubmit, onCancel, load
         </div>
       </section>
 
-      <div className="flex justify-end gap-3 pt-4 border-t border-ink-100">
+      {/* Sticky on a phone: these forms are long, and hunting for the save
+          button at the bottom of a full screen of scrolling is the kind of small
+          friction that stops you capturing a lead at all. */}
+      <div className="flex justify-end gap-3 pt-3 border-t border-ink-100
+                      sticky bottom-0 -mx-6 px-6 pb-1 bg-white/95 backdrop-blur-sm z-10">
         <Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button>
         <Button type="submit" variant="primary" loading={loading}
           disabled={touched && !valid}

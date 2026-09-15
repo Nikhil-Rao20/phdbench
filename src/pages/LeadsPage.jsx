@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus, Lightbulb, ExternalLink, Pencil, Archive as ArchiveIcon,
@@ -227,6 +227,16 @@ export default function LeadsPage() {
   const [editTarget, setEditTarget] = useState(null)
   const [convertTarget, setConvertTarget] = useState(null)
   const [saving, setSaving] = useState(false)
+  // Whether each open form has actually been edited, so an untouched one
+  // closes on a backdrop click without asking.
+  const [addDirty, setAddDirty] = useState(false)
+  const [editDirty, setEditDirty] = useState(false)
+
+  // Reset when a form closes, by any route — cancel, backdrop, discard or a
+  // successful save. Without this a discarded edit leaves the flag set, and the
+  // next time the form opens it warns about changes that no longer exist.
+  useEffect(() => { if (!addOpen) setAddDirty(false) }, [addOpen])
+  useEffect(() => { if (!editTarget) setEditDirty(false) }, [editTarget])
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('active')
 
@@ -401,14 +411,15 @@ export default function LeadsPage() {
       )}
 
       <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Save a new lead"
-        description="Capture it now, decide later." confirmClose>
-        <LeadForm onSubmit={handleAdd} onCancel={() => setAddOpen(false)} loading={saving} />
+        description="Capture it now, decide later." isDirty={addDirty}>
+        <LeadForm onSubmit={handleAdd} onCancel={() => setAddOpen(false)}
+          onDirtyChange={setAddDirty} loading={saving} />
       </Modal>
 
-      <Modal open={!!editTarget} onClose={() => setEditTarget(null)} title="Edit lead" confirmClose>
+      <Modal open={!!editTarget} onClose={() => setEditTarget(null)} title="Edit lead" isDirty={editDirty}>
         {editTarget && (
           <LeadForm initial={editTarget} onSubmit={handleEdit}
-            onCancel={() => setEditTarget(null)} loading={saving} />
+            onCancel={() => setEditTarget(null)} onDirtyChange={setEditDirty} loading={saving} />
         )}
       </Modal>
 

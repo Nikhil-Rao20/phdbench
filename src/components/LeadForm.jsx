@@ -6,6 +6,7 @@ import { knownEntities, findDuplicate } from '../lib/derive'
 import { DEFAULT_RESEARCH_AREAS, PRIORITY, currencyForCountry } from '../lib/model'
 import { Field, Input, TextArea, Select, Combobox, CountrySelect, Segmented, DeadlineInput } from './form'
 import { Button, cn } from './ui'
+import { useDirty } from '../hooks/useDirty'
 
 const SOURCES = ['LinkedIn', 'Twitter/X', 'Lab website', 'Email list', 'Conference', 'Friend/Referral', 'Cold search', 'Other']
 
@@ -15,7 +16,7 @@ const PRIORITY_OPTIONS = [
   { value: PRIORITY.SAFE,   label: 'Safe',   icon: Shield, help: 'Strong chance of admission.' },
 ]
 
-export default function LeadForm({ initial = {}, onSubmit, onCancel, loading }) {
+export default function LeadForm({ initial = {}, onSubmit, onCancel, onDirtyChange, loading }) {
   const { applications, leads } = useData()
   const entities = useMemo(() => knownEntities(applications, leads), [applications, leads])
 
@@ -38,6 +39,9 @@ export default function LeadForm({ initial = {}, onSubmit, onCancel, loading }) 
 
   const [touched, setTouched] = useState(false)
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  // Only an actually-edited form warns before closing.
+  useDirty(form, onDirtyChange)
 
   // Warn before creating a second card for a lab already tracked, rather than
   // discovering the duplicate weeks later.
@@ -190,7 +194,11 @@ export default function LeadForm({ initial = {}, onSubmit, onCancel, loading }) 
         />
       </Field>
 
-      <div className="flex justify-end gap-3 pt-2 border-t border-ink-100">
+      {/* Sticky on a phone: these forms are long, and hunting for the save
+          button at the bottom of a full screen of scrolling is the kind of small
+          friction that stops you capturing a lead at all. */}
+      <div className="flex justify-end gap-3 pt-3 border-t border-ink-100
+                      sticky bottom-0 -mx-6 px-6 pb-1 bg-white/95 backdrop-blur-sm z-10">
         <Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button>
         <Button
           type="submit"

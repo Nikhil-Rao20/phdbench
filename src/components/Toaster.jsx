@@ -4,7 +4,7 @@
 
 import { AnimatePresence, motion } from 'framer-motion'
 import { CheckCircle2, AlertTriangle, Info, Undo2, X, RotateCw, Loader2 } from 'lucide-react'
-import { useToast } from '../hooks/useToast'
+import { useToast, useToastList } from '../hooks/useToast'
 
 const TONES = {
   success: {
@@ -128,7 +128,8 @@ function Toast({ toast, onDismiss }) {
 }
 
 export default function Toaster() {
-  const { toasts, dismiss } = useToast()
+  const toasts = useToastList()
+  const { dismiss } = useToast()
 
   return (
     <div

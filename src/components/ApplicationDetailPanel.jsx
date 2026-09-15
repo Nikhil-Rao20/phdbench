@@ -1,5 +1,6 @@
 // src/components/ApplicationDetailPanel.jsx
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, ExternalLink, Plus, Trash2, MessageSquare, Clock, FileText,
@@ -113,7 +114,10 @@ export default function ApplicationDetailPanel({ appId, uid, onClose, onEdit }) 
     if (r.ok) setNote('')
   }
 
-  return (
+  // Portalled for the same reason as Modal: Layout's animated wrapper is a
+  // containing block for position:fixed, so in place this panel and its backdrop
+  // were confined to the content column and left the sidebar undimmed.
+  return createPortal(
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -460,6 +464,7 @@ export default function ApplicationDetailPanel({ appId, uid, onClose, onEdit }) 
           </Button>
         </footer>
       </motion.aside>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
 }
