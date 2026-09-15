@@ -28,6 +28,24 @@ import './index.css'
   window.history.replaceState(null, '', pathname.replace(/\/$/, '') + '/' + decoded + hash)
 })()
 
+// Clickjacking defence (frame-buster).
+//
+// GitHub Pages sets no headers, so X-Frame-Options is unavailable and CSP's
+// frame-ancestors cannot be set from a meta tag. If this page is ever framed by
+// another site — to overlay invisible buttons on top of real ones — break out of
+// the frame rather than render inside it.
+try {
+  if (window.top !== window.self) {
+    window.top.location = window.self.location
+  }
+} catch {
+  // Cross-origin access to window.top throws, which itself proves we are framed
+  // by a foreign site. Refuse to render at all.
+  document.documentElement.innerHTML =
+    '<p style="font:16px system-ui;padding:2rem">PhDBench cannot be displayed inside another site.</p>'
+  throw new Error('Refusing to render inside a cross-origin frame')
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ErrorBoundary>

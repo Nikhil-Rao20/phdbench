@@ -90,7 +90,22 @@ groups.
 
 ---
 
-## 5. Only if you ever remove the approval gate
+## 5. Right after the first deploy — 30 seconds
+
+- [ ] **Open the browser console (F12) and look for red CSP errors.**
+      I added a Content Security Policy, which restricts what the page may load
+      and connect to. It is the single best defence against an injected script,
+      but it is also the change most likely to block something legitimate, and I
+      cannot test it against live Firebase from here — the harness runs without a
+      real Firestore connection.
+
+      If you see `Refused to connect to …` or `Refused to load …`, copy the line
+      and send it to me; it is a one-word fix to the policy in `index.html`.
+      If sign-in works and your leads appear, it is fine.
+
+---
+
+## 6. Only if you ever remove the approval gate
 
 - [ ] **Firebase Blaze plan + budget cap.** Not needed while access is approved
       by hand — you should stay comfortably inside the free tier. Required only

@@ -2,6 +2,27 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Content Security Policy.
+             GitHub Pages serves static files and sets no headers, so this is the only
+             place a policy can live. frame-ancestors is header-only and cannot be set
+             here, so clickjacking is handled by the frame-buster in main.jsx instead.
+    
+             connect-src lists exactly the Google endpoints Firebase Auth and Firestore
+             use; anything else the page tries to reach is blocked by the browser. -->
+        <meta http-equiv="Content-Security-Policy" content="
+          default-src 'self';
+          script-src 'self' https://www.googletagmanager.com;
+          style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+          font-src 'self' https://fonts.gstatic.com data:;
+          img-src 'self' data: blob: https://lh3.googleusercontent.com https://*.googleusercontent.com;
+          connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://firestore.googleapis.com https://www.googletagmanager.com https://*.google-analytics.com;
+          frame-src https://phdbench.firebaseapp.com https://accounts.google.com;
+          object-src 'none';
+          base-uri 'self';
+          form-action 'self';
+          upgrade-insecure-requests;
+        ">
+        <meta name="referrer" content="strict-origin-when-cross-origin" />
     <link rel="icon" type="image/svg+xml" href="/phdbench/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PhDBench | PhD Application Management System</title>
