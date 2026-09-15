@@ -94,10 +94,34 @@ const invariants = [
     /match \/\{document=\*\*\}\s*\{\s*allow read, write: if false;/,
     'any future collection would default to open',
   ],
+  [
+    'group membership is decided by memberEmails alone',
+    /function inGroup\(gid\)[\s\S]*?groupDoc\(gid\)\.memberEmails\.hasAny\(\[email\(\)\]\)/,
+    'membership must have exactly one source of truth',
+  ],
+  [
+    'membership does NOT also accept the members map',
+    // Deliberately inverted: this passes only when the pattern is ABSENT.
+    // Accepting the map as an alternative made removal ineffective — the email
+    // came out of the list while the uid stayed in the map, and the map alone
+    // still granted entry.
+    (text) => !/function inGroup\(gid\)[\s\S]*?members\.keys\(\)\.hasAny/.test(
+      text.slice(text.indexOf('function inGroup'), text.indexOf('function groupAdmin')),
+    ),
+    'a removed member would keep access through their stale display entry',
+  ],
+  [
+    'a member may leave, and only by removing their own address',
+    /removeAll\(\[email\(\)\]\)/,
+    'the interface offers a "leave" action the server would otherwise refuse',
+  ],
 ]
 
 for (const [name, pattern, why] of invariants) {
-  check(name, pattern.test(rules), why)
+  // A few invariants assert the ABSENCE of a pattern, so they are expressed as
+  // predicates rather than regexes.
+  const passed = typeof pattern === 'function' ? pattern(rules) : pattern.test(rules)
+  check(name, passed, why)
 }
 
 // ── Report ───────────────────────────────────────────────────────────────────

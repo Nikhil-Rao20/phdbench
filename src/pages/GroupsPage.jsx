@@ -10,7 +10,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useGroups } from '../hooks/useGroups'
 import { useMutation, useToast } from '../hooks/useToast'
 import {
-  createGroup, renameGroup, inviteMember, removeMember, deleteGroup,
+  createGroup, renameGroup, inviteMember, removeMember, deleteGroup, leaveGroup,
 } from '../lib/groupsDb'
 import { isGroupAdmin, LIMITS } from '../lib/access'
 import Modal from '../components/Modal'
@@ -225,10 +225,20 @@ export default function GroupsPage() {
   }
 
   const handleRemoveMember = (group, who) => {
-    mutate(() => removeMember(group.id, who), {
-      success: 'Removed. Their leads stay on the board.',
-      failure: 'Could not remove them.',
-    })
+    const myEmail = String(user?.email || '').toLowerCase()
+    const leaving = who.email === myEmail
+
+    // Leaving is a different write from removing someone else — a member is
+    // only permitted to take their own address out — so it uses its own call.
+    mutate(
+      () => (leaving ? leaveGroup(group.id, user) : removeMember(group.id, who)),
+      {
+        success: leaving
+          ? 'You have left the group. Leads you added stay on the board.'
+          : 'Removed. Their leads stay on the board.',
+        failure: leaving ? 'Could not leave that group.' : 'Could not remove them.',
+      },
+    )
   }
 
   const handleDelete = async () => {

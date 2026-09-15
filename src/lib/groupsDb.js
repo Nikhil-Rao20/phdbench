@@ -182,23 +182,47 @@ export async function inviteMember(gid, email) {
   })
 }
 
+/**
+ * Remove somebody from a group.
+ *
+ * Taking their address out of `memberEmails` is what actually revokes access —
+ * that list is the single source of truth, in the rules and here. The `members`
+ * map is display metadata and is tidied afterwards; if that second write fails,
+ * they are already locked out, which is the correct order to fail in.
+ */
 export async function removeMember(gid, { uid, email }) {
   const clean = normaliseEmail(email)
-  const patch = { updatedAt: serverTimestamp() }
-  if (clean) patch.memberEmails = arrayRemove(clean)
+  if (!clean) throw new Error('No address to remove.')
 
-  await updateDoc(groupDoc(gid), patch)
+  await updateDoc(groupDoc(gid), {
+    memberEmails: arrayRemove(clean),
+    updatedAt: serverTimestamp(),
+  })
 
-  // Their uid entry goes separately: a single update cannot both arrayRemove and
-  // delete a nested key reliably across SDK versions.
+  // Best-effort tidy-up of the display metadata. A member removing themselves
+  // is not allowed to touch this map by the rules, so a refusal here is
+  // expected and harmless — access is already gone.
   if (uid) {
-    const snap = await getDoc(groupDoc(gid))
-    if (snap.exists()) {
-      const members = { ...(snap.data().members || {}) }
-      delete members[uid]
-      await updateDoc(groupDoc(gid), { members, updatedAt: serverTimestamp() })
+    try {
+      const snap = await getDoc(groupDoc(gid))
+      if (snap.exists()) {
+        const members = { ...(snap.data().members || {}) }
+        delete members[uid]
+        await updateDoc(groupDoc(gid), { members })
+      }
+    } catch {
+      // Already revoked; the stale display entry is cosmetic.
     }
   }
+}
+
+/** Leave a group yourself. Removes only your own address, which the rules allow. */
+export async function leaveGroup(gid, user) {
+  const clean = normaliseEmail(user.email)
+  return updateDoc(groupDoc(gid), {
+    memberEmails: arrayRemove(clean),
+    updatedAt: serverTimestamp(),
+  })
 }
 
 /**

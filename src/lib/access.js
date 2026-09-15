@@ -89,7 +89,10 @@ export const canUseApp = (user, request) => accessState(user, request) === ACCES
  */
 export function isMember(group, user) {
   if (!group || !user) return false
-  if (group.members && group.members[user.uid]) return true
+  // `memberEmails` alone decides access, matching firestore.rules exactly.
+  // Accepting the `members` map as an alternative made removal ineffective:
+  // the email came out of the list while the uid stayed in the map, and the
+  // map alone still let them in.
   const email = normalise(user.email)
   return Boolean(email) && (group.memberEmails || []).map(normalise).includes(email)
 }

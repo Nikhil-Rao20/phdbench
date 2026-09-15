@@ -156,11 +156,17 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/groups/$(gid)).data;
     }
 
+    // `memberEmails` is the SINGLE source of truth for access. The `members`
+    // map holds display metadata only — names, roles, when they joined.
+    //
+    // This was previously an OR across both, which made removing somebody
+    // ineffective: their email came out of the list while their uid stayed in
+    // the map, and the map alone still granted entry. Access must be revocable
+    // by changing exactly one thing.
     function inGroup(gid) {
       return approved()
           && exists(/databases/$(database)/documents/groups/$(gid))
-          && (groupDoc(gid).members.keys().hasAny([request.auth.uid])
-              || groupDoc(gid).memberEmails.hasAny([email()]));
+          && groupDoc(gid).memberEmails.hasAny([email()]);
     }
 
     function groupAdmin(gid) {
@@ -192,6 +198,17 @@ service cloud.firestore {
       allow update: if (groupAdmin(gid) || isAdmin())
                     && request.resource.data.createdBy == resource.data.createdBy
                     && request.resource.data.memberEmails.size() <= 25
+                    && sane();
+
+      // A member may leave, and that is the only change they may make: the
+      // incoming list must be exactly the old one minus their own address, and
+      // the group's identity must be untouched. Without this the interface
+      // would offer a "leave" action the server refuses.
+      allow update: if inGroup(gid)
+                    && request.resource.data.memberEmails ==
+                       resource.data.memberEmails.removeAll([email()])
+                    && request.resource.data.createdBy == resource.data.createdBy
+                    && request.resource.data.name == resource.data.name
                     && sane();
 
       allow delete: if groupAdmin(gid) || isAdmin();
