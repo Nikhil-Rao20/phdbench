@@ -1,0 +1,14 @@
+{
+  "indexes": [
+    {
+      "//": "subscribeMyGroups: where('memberEmails','array-contains',email) + orderBy('createdAt'). An array-contains filter combined with an order-by on a different field always needs a composite index; without it the query fails outright in production rather than merely running slowly.",
+      "collectionGroup": "groups",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "memberEmails", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

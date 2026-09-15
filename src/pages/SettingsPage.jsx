@@ -15,6 +15,7 @@ import {
 } from '../lib/model'
 import { daysUntil, todayInZone } from '../lib/datetime'
 import DocumentsManager from '../components/DocumentsManager'
+import LeadMigration from '../components/LeadMigration'
 import { Button, SectionTitle, Badge, EmptyState, Tooltip, cn } from '../components/ui'
 import { Field, Input, Select, TextArea } from '../components/form'
 
@@ -437,6 +438,8 @@ export default function SettingsPage() {
         <h1 className="font-display text-3xl text-ink-900">Settings</h1>
         <p className="text-ink-500 text-sm mt-1">Make it yours.</p>
       </div>
+
+      <LeadMigration />
 
       {needsMigration && (
         <div className="bg-white rounded-2xl border border-sky-200 shadow-surface p-5">
