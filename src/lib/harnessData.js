@@ -433,3 +433,33 @@ export const harnessGroupLeads = () => leads.map((lead, i) => {
     schemaVersion: 3,
   }
 })
+
+/** Access-request queue fixtures, for photographing the admin screen. */
+export const harnessAccessRequests = () => ([
+  {
+    id: 'req-1', status: 'pending', name: 'Priya Sharma', email: 'priya@example.com',
+    googleName: 'Priya Sharma', location: 'Bengaluru, India', position: 'masters',
+    applyingFor: 'Computer Vision PhD, Fall 2027', applyingTo: 'foreign',
+    link: 'https://scholar.google.com/citations?user=example',
+    heardFrom: 'A friend already using it', requestedAt: ts(0),
+    note: 'Working on retinal segmentation at IISc, two workshop papers so far.',
+  },
+  {
+    id: 'req-2', status: 'pending', name: 'Arjun Menon', email: 'arjun@example.com',
+    googleName: 'Arjun Menon', location: 'Kochi, India', position: 'undergraduate',
+    applyingFor: 'Robotics PhD, Fall 2027', applyingTo: 'both',
+    link: 'https://github.com/example', heardFrom: 'LinkedIn post', requestedAt: ts(1),
+  },
+  {
+    id: 'req-3', status: 'approved', name: 'Rahul Verma', email: 'rahul@example.com',
+    googleName: 'Rahul Verma', location: 'Hyderabad, India', position: 'undergraduate',
+    applyingFor: 'Machine Learning PhD, Fall 2027', applyingTo: 'foreign',
+    link: 'https://rahul.example.com', heardFrom: 'Friend', requestedAt: ts(9),
+  },
+  {
+    id: 'req-4', status: 'rejected', name: 'Test Account', email: 'spam@example.com',
+    googleName: 'Test', location: 'Unknown', position: 'other',
+    applyingFor: 'n/a', applyingTo: 'both', link: 'https://example.com',
+    heardFrom: 'Search', requestedAt: ts(20), decisionNote: 'Could not verify this is a real applicant.',
+  },
+])

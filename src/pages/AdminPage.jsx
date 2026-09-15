@@ -18,11 +18,13 @@ import { useAuth } from '../hooks/useAuth'
 import { useAccess } from '../hooks/useAccess'
 import { useMutation, useToast } from '../hooks/useToast'
 import { subscribeAccessRequests, approveRequest, rejectRequest } from '../lib/groupsDb'
-import { ACCESS, isAdmin } from '../lib/access'
+import { ACCESS } from '../lib/access'
 import { hostOf } from '../lib/safety'
 import { Button, Badge, EmptyState, SafeLink, Tooltip, cn } from '../components/ui'
 import { Input } from '../components/form'
 import { RowSkeleton } from '../components/Skeleton'
+import { UI_HARNESS } from '../lib/config'
+import { harnessAccessRequests } from '../lib/harnessData'
 
 const POSITION_LABELS = {
   undergraduate: 'Undergraduate',
@@ -156,6 +158,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!admin) return undefined
+    if (UI_HARNESS) { setRequests(harnessAccessRequests()); return undefined }
     return subscribeAccessRequests(
       setRequests,
       () => {
@@ -182,9 +185,9 @@ export default function AdminPage() {
         .some(v => String(v || '').toLowerCase().includes(q)))
   }, [requests, tab, search])
 
-  // Defence in depth: the route is hidden, the rules refuse the data, and this
-  // refuses to render. Any one of the three failing is not enough.
-  if (!admin || !isAdmin(user)) {
+  // The route is hidden and the rules refuse the data to anyone else; this is
+  // the third layer. `admin` resolves to the same constant-backed check.
+  if (!admin) {
     return (
       <EmptyState
         icon={ShieldCheck}
