@@ -11,7 +11,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "shoot": "node scripts/shoot.mjs",
-    "check": "vitest run && vite build"
+    "check": "node scripts/check-access-parity.mjs && vitest run && vite build",
+    "check:access": "node scripts/check-access-parity.mjs",
+    "check:modal": "node scripts/check-modal.mjs",
+    "verify": "npm run check && npm run shoot && node scripts/check-modal.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",

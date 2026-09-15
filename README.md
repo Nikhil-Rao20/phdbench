@@ -2,7 +2,8 @@
 
 # PhDBench 🎓
 
-**A personal PhD application tracker — leads, applications, deadlines, letters, fees and follow-ups.**
+**A PhD application tracker — a shared board of leads with the people you trust,
+and an application tracker that stays private to you.**
 
 Built for applying from India to universities worldwide.
 
@@ -50,6 +51,21 @@ Built for applying from India to universities worldwide.
 *Documents, recommenders, test scores with expiry, credential evaluation, and backup.*
 
 <img src="docs/screenshots/settings-desktop.png" width="900" alt="Settings page on desktop" />
+
+### Groups
+*A shared board per group. Facts are common; what each person decided stays theirs.*
+
+<img src="docs/screenshots/groups-desktop.png" width="900" alt="Groups page on desktop" />
+
+### Access queue — admin only
+*Everyone who asks to use PhDBench, with what they told you about themselves.*
+
+<img src="docs/screenshots/admin-desktop.png" width="900" alt="Access approval queue" />
+
+### Asking for access
+*The front door for anyone who is not approved yet.*
+
+<img src="docs/screenshots/request-access-desktop.png" width="900" alt="Request access form" />
 
 </div>
 
@@ -102,7 +118,7 @@ Plus `⌘K` search across everything, `.ics` calendar export so Google Calendar 
 | Motion | Framer Motion |
 | Charts | Recharts |
 | Routing | React Router v6 |
-| Auth | Firebase Auth (Google, single-owner) |
+| Auth | Firebase Auth (Google) + approval queue |
 | Database | Firestore — realtime listeners + persistent offline cache |
 | Offline | vite-plugin-pwa / Workbox |
 | Tests | Vitest |
@@ -120,54 +136,59 @@ npm run dev          # http://localhost:5173/phdbench/
 
 | Command | What it does |
 |---|---|
-| `npm test` | Unit tests |
-| `npm run build` | Production build |
-| `npm run check` | Tests, then build |
-| `npm run shoot` | Screenshots every screen at desktop and mobile sizes |
+| `npm test` | 114 unit tests |
+| `npm run check` | Access-rule parity, tests, then build |
+| `npm run shoot` | Screenshots all 15 screens at desktop and mobile sizes |
+| `npm run check:modal` | Drives the app in a real browser and checks dialog behaviour |
+| `npm run verify` | Everything above, in order |
 
-`npm run shoot` builds with `VITE_UI_HARNESS=1`, which swaps auth for a fixture user and Firestore for an in-memory dataset, then photographs all nine screens and **fails on any console error**. The fixture is built to force every state onto the screen — each stage, a deadline crossing the date line, an overdue draft, a lapsed score, an unasked recommender, archived records — so a state that renders wrongly cannot hide. The images above come from it.
+`npm run shoot` builds with `VITE_UI_HARNESS=1`, which swaps auth for a fixture user and Firestore for an in-memory dataset, then photographs every screen at both sizes. It **fails** on a console error, a leftover loading skeleton, or any horizontal scrolling — naming the element that caused it. Crucially it waits for four separate signals before each shot (content visible, no skeletons, fonts resolved, images complete), because `networkidle` only means requests stopped, and a screenshot taken then is a picture of a half-built page that looks plausible enough to pass review. The images above come from it.
 
 ---
 
-## Firebase
+## Access and security
 
-### ⚠️ Confirm the owner address first
+Anyone may sign in with Google. Nobody gets in without being approved.
 
-PhDBench is locked to a single Google account. The address appears in **two** places, and they must match each other and the account you actually sign in with:
+That is deliberate: it keeps the project inside Firebase's free tier while still being open to the public. An unapproved visitor lands on a request form — name, where they are based, what they are studying, a link, what they are applying for, India or abroad, and how they heard about it — which arrives in the admin queue for a one-click decision.
 
-| File | Constant | Controls |
-|---|---|---|
-| `src/lib/config.js` | `OWNER_EMAIL` | The UI gate |
-| `firestore.rules` | `ownerEmail()` | The real enforcement |
+**The administrator is a constant in `firestore.rules`, never data.** Nothing anybody can write inside the app can grant it, so no user can escalate their own access. Everyone else is capped at 500 leads and 500 applications.
 
-Both are set to `nikhil01446@gmail.com`, confirmed by the owner.
+### Three data classes
 
-Getting `config.js` wrong is a minor inconvenience: you land on a screen naming the address you signed in with and telling you which file to edit. **Getting `firestore.rules` wrong locks you out of your own data at the database layer**, and the only way back is the Firebase console. Change both together.
+| Path | Who can read it |
+|---|---|
+| `users/{uid}/…` | That person alone — applications, documents, recommenders, scores |
+| `groups/{gid}/leads/…` | The group's members |
+| `accessRequests/{uid}` | The requester, and the administrator |
 
-### Publishing the rules
+A lead's facts belong to the group; what each person decided about it lives under their own uid inside the same document. Group membership is decided by `memberEmails` alone, in both the rules and the client, so removing somebody actually revokes them.
 
-The rules live in `firestore.rules`, version-controlled — unlike the previous arrangement, where they existed only as a paste block in this README and nobody could tell what was actually deployed.
+`scripts/check-access-parity.mjs` fails the build if the rules and the client's copy of that logic drift apart, or if one of 17 security invariants is deleted — including one that asserts the *absence* of a previously-fixed hole.
 
-**Console:** [console.firebase.google.com](https://console.firebase.google.com/) → `phdbench` → Firestore Database → Rules → paste `firestore.rules` → Publish.
+### Other defences
 
-**CLI:** `npm i -g firebase-tools && firebase login && firebase deploy --only firestore:rules` (`firebase.json` already points at the file).
+- **Every user-supplied URL is scheme-checked** before it reaches an `href`. Shared leads mean one member's input renders in another member's authenticated session, so a stored `javascript:` URL would otherwise execute on click. 33 tests cover the bypasses that defeat naive filters — mixed case, embedded tabs and newlines, leading control characters, `data:`, `vbscript:`.
+- **Content Security Policy** pins scripts to the app's own bundle and enumerates exactly the endpoints Firebase needs.
+- **Frame-buster**, because GitHub Pages cannot set `X-Frame-Options`.
 
-The rules allow only the owner's email-verified account, confine it to `/users/{uid}/`, and deny everything outside `/users` outright. Anyone else who signs in is refused at the database layer, not merely hidden in the interface.
+### Deploying
 
-### Backups
+⚠️ **Order matters.** Push the app code first and let Actions deploy it, *then* publish `firestore.rules`. The new rules require an approval record the old code does not create, so publishing first locks you out until the code catches up.
 
-Firestore's free Spark plan has **no automated backup**. The export in Settings is therefore not a nicety — it is the only thing between you and total loss if the project is deleted, misconfigured, or made unreachable by a rules mistake. The app nags after 30 days.
+Then add the composite index from `firestore.indexes.json`. Firebase prints a one-click link in the browser console the first time the query runs, which is usually the easiest route.
+
+Firestore's free plan has **no automated backup**. The export in Settings is the only thing between you and total loss; the app nags after 30 days.
 
 ---
 
 ## Data shape
 
 ```
-users/{uid}/
+users/{uid}/                 PRIVATE — nobody else, ever
   profile/main       displayName, recommenders[], testScores[],
                      credentialEvals[], emailTemplates[], lastExportAt
-  leads/{id}         university, labName, professor, country, priority,
-                     fitScore, startDate, deadline, state, archivedAt
+  leads/{id}         legacy private leads, kept as a migration fallback
   applications/{id}  everything above, plus stage, submittedAt, decidedAt,
                      intake, applicationType, appUrl, applicationId,
                      deadline / lorDeadline / expectedDecision (date+time+tz),
@@ -177,7 +198,19 @@ users/{uid}/
     followups/{id}   note, date, replied
     activity/{id}    note, system, createdAt
   documents/{id}     name, order
+
+groups/{gid}                 SHARED with the group
+  name, createdBy, members{uid: {role,name,email}}, memberEmails[]
+  leads/{id}         university, labName, professor, country, deadline,
+                     fundingNote, notes, addedBy, addedByName,
+                     states{uid: {state, priority, fitScore, archivedAt}}
+
+accessRequests/{uid}         THE APPROVAL QUEUE
+  name, email, location, position, link, applyingFor, applyingTo,
+  heardFrom, note, status, decidedAt
 ```
+
+A lead's **facts** are shared; the `states` map holds what each member decided about it. Writing `states.<your uid>` is the only way you change your own view, and it cannot disturb anyone else's — which is what lets one board serve several applicants with different opinions about the same lab.
 
 Dates are stored as `{ date, time, tz }`. A bare legacy string is read in your local timezone, which places it *earlier* than a Western university's real cut-off — if an unlabelled date has to be wrong, being wrong toward "submit sooner" is the only acceptable direction.
 
@@ -185,6 +218,6 @@ Dates are stored as `{ date, time, tz }`. A bare legacy string is read in your l
 
 <div align="center">
 
-*Personal use. All data private to one Google account.*
+*Your applications are yours alone. Your leads are shared only with the people you invite.*
 
 </div>
