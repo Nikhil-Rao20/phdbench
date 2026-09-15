@@ -16,7 +16,7 @@ import Modal from '../components/Modal'
 import ApplicationForm from '../components/ApplicationForm'
 import ApplicationDetailPanel from '../components/ApplicationDetailPanel'
 import { CardGridSkeleton } from '../components/Skeleton'
-import { Button, EmptyState, Tooltip, Badge, cn } from '../components/ui'
+import { Button, EmptyState, Tooltip, Badge, cn, SafeLink } from '../components/ui'
 import {
   StageBadge, PriorityBadge, FitScore, DeadlineDisplay, CountryChip,
   DocsProgress, LorSummary, FeeDisplay, feeInINR,
@@ -104,11 +104,11 @@ function ApplicationCard({ app, documents, index, cycleTotalINR, onOpen, onEdit,
       >
         {app.appUrl && (
           <Tooltip label="Open the application portal">
-            <a href={app.appUrl} target="_blank" rel="noreferrer"
+            <SafeLink href={app.appUrl}
               className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs
                          text-ink-500 hover:bg-ink-100 hover:text-ink-800 transition-colors duration-120">
               <ExternalLink size={12} aria-hidden="true" /> Portal
-            </a>
+            </SafeLink>
           </Tooltip>
         )}
         <div className="flex-1" />

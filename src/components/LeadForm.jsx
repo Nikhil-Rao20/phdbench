@@ -5,7 +5,7 @@ import { useData } from '../hooks/useData'
 import { knownEntities, findDuplicate } from '../lib/derive'
 import { DEFAULT_RESEARCH_AREAS, PRIORITY, currencyForCountry } from '../lib/model'
 import { Field, Input, TextArea, Select, Combobox, CountrySelect, Segmented, DeadlineInput } from './form'
-import { Button, cn } from './ui'
+import { Button, cn, SafeLink } from './ui'
 import { useDirty } from '../hooks/useDirty'
 
 const SOURCES = ['LinkedIn', 'Twitter/X', 'Lab website', 'Email list', 'Conference', 'Friend/Referral', 'Cold search', 'Other']
@@ -157,14 +157,14 @@ export default function LeadForm({ initial = {}, onSubmit, onCancel, onDirtyChan
               placeholder="https://lab.university.edu"
             />
             {form.labUrl && (
-              <a
-                href={form.labUrl} target="_blank" rel="noreferrer"
+              <SafeLink
+                href={form.labUrl}
                 title="Open the lab site in a new tab"
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-sage-600
                            transition-colors duration-120"
               >
                 <ExternalLink size={15} aria-hidden="true" />
-              </a>
+              </SafeLink>
             )}
           </div>
         </Field>

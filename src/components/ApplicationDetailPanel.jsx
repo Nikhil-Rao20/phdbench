@@ -21,7 +21,7 @@ import {
   StageBadge, DeadlineDisplay, PriorityBadge, FitScore, CountryChip,
   DocsProgress, LorStatusBadge, FeeDisplay,
 } from './domain'
-import { Button, Badge, Progress, SectionTitle, Tooltip, CopiedPill, cn } from './ui'
+import { Button, Badge, Progress, SectionTitle, Tooltip, CopiedPill, cn, SafeLink } from './ui'
 import { Select, TextArea, Input } from './form'
 import EmailComposer from './EmailComposer'
 
@@ -221,8 +221,8 @@ export default function ApplicationDetailPanel({ appId, uid, onClose, onEdit }) 
                   { url: app.appUrl, label: 'Apply portal', tone: 'sage' },
                   { url: app.driveLink, label: 'Documents', tone: 'sky' },
                 ].filter(l => l.url).map(l => (
-                  <a
-                    key={l.label} href={l.url} target="_blank" rel="noreferrer"
+                  <SafeLink
+                    key={l.label} href={l.url}
                     className={cn(
                       'inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border',
                       'transition-colors duration-150 hover:bg-ink-50',
@@ -232,7 +232,7 @@ export default function ApplicationDetailPanel({ appId, uid, onClose, onEdit }) 
                     )}
                   >
                     <ExternalLink size={11} aria-hidden="true" /> {l.label}
-                  </a>
+                  </SafeLink>
                 ))}
               </div>
 

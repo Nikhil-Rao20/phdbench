@@ -1,82 +1,222 @@
 rules_version = '2';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PhDBench — single-owner Firestore security rules
+// PhDBench security rules
 //
-// ⚠️  BEFORE PUBLISHING: confirm OWNER_EMAIL below is the exact Google account
-//     you sign in with. Publishing with the wrong address locks you out of
-//     your own data. Confirmed 2026-09-05. See the README for how to publish.
+// Three kinds of data, three different answers:
 //
-// Model: every document lives under /users/{uid}/... and only the owner's
-// authenticated, email-verified account may touch its own subtree. Anyone else
-// who signs in is denied at the rules layer, not merely hidden in the UI.
+//   users/{uid}/…            PRIVATE. Only that person, ever. Applications,
+//                            documents, recommenders, test scores, stats.
+//   groups/{gid}/leads/…     SHARED with the group's members. Facts are common;
+//                            each person's decision about a lead lives under
+//                            their own uid inside the document.
+//   accessRequests/{uid}     The approval queue. A signed-in stranger may
+//                            create their own, and read only their own. Only
+//                            the administrator may approve.
+//
+// ⚠️  adminEmail() below is the ONLY privilege not stored in the database, and
+//     that is deliberate: nothing a user can write can make them an
+//     administrator. Changing it wrongly locks the real owner out of approving
+//     anyone. Verify before publishing.
+//
+// Mirrored by `src/lib/access.js` so the interface can predict these answers.
+// That file secures nothing — it runs on the user's own machine. This does.
 // ─────────────────────────────────────────────────────────────────────────────
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function ownerEmail() {
+    // ── Identity ─────────────────────────────────────────────────────────────
+
+    function adminEmail() {
       return 'nikhil01446@gmail.com';
     }
 
-    function isOwner() {
+    function signedIn() {
       return request.auth != null
           && request.auth.token.email != null
-          && request.auth.token.email_verified == true
-          && request.auth.token.email.lower() == ownerEmail();
+          && request.auth.token.email_verified == true;
     }
 
-    // Owner, and operating inside their own namespace.
-    function ownsNamespace(userId) {
-      return isOwner() && request.auth.uid == userId;
+    function email() {
+      return request.auth.token.email.lower();
     }
 
-    // Guard against a runaway client writing unbounded documents.
-    // Firestore caps a document at 1 MiB; these are far tighter sanity limits.
-    function withinSizeLimits() {
+    function isAdmin() {
+      return signedIn() && email() == adminEmail();
+    }
+
+    // ── Approval ─────────────────────────────────────────────────────────────
+
+    // A document read per check. Firestore caches it within a single request,
+    // and the alternative — trusting a claim the client supplies — is not a
+    // real alternative.
+    function requestDoc() {
+      return get(/databases/$(database)/documents/accessRequests/$(request.auth.uid)).data;
+    }
+
+    function hasRequest() {
+      return exists(/databases/$(database)/documents/accessRequests/$(request.auth.uid));
+    }
+
+    function approved() {
+      return isAdmin() || (signedIn() && hasRequest() && requestDoc().status == 'approved');
+    }
+
+    // ── Shape guards ─────────────────────────────────────────────────────────
+
+    // Firestore caps a document at 1 MiB. These are far tighter, and exist so a
+    // single account cannot quietly store megabytes of junk in a free project.
+    function sane() {
       return request.resource.data.size() <= 80;
     }
 
-    match /users/{userId} {
-      allow read, write: if ownsNamespace(userId);
+    function shortText(value, max) {
+      return !(value is string) || value.size() <= max;
+    }
 
-      // Applications and everything nested beneath them
-      // (followups, activity, recommenders, …).
+    // ── Access requests ──────────────────────────────────────────────────────
+
+    match /accessRequests/{uid} {
+      // Read your own to learn where you stand. The administrator reads the queue.
+      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+
+      // Ask for access — for yourself only, starting as pending, never
+      // pre-approved. Without pinning `status` here, anyone could sign in and
+      // write themselves an approved record.
+      allow create: if signedIn()
+                    && request.auth.uid == uid
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.email == email()
+                    && sane()
+                    && shortText(request.resource.data.get('name', ''), 120)
+                    && shortText(request.resource.data.get('link', ''), 500)
+                    && shortText(request.resource.data.get('applyingFor', ''), 300)
+                    && shortText(request.resource.data.get('location', ''), 200)
+                    && shortText(request.resource.data.get('heardFrom', ''), 300)
+                    && shortText(request.resource.data.get('note', ''), 1000);
+
+      // Only the administrator decides. A rejected or pending applicant may
+      // correct their own submission, but can never change its status.
+      allow update: if isAdmin()
+                    || (signedIn()
+                        && request.auth.uid == uid
+                        && request.resource.data.status == resource.data.status
+                        && sane());
+
+      allow delete: if isAdmin();
+    }
+
+    // ── Private space ────────────────────────────────────────────────────────
+
+    function ownsNamespace(uid) {
+      return approved() && request.auth.uid == uid;
+    }
+
+    match /users/{uid} {
+      allow read, write: if ownsNamespace(uid);
+
       match /applications/{appId} {
-        allow read, delete: if ownsNamespace(userId);
-        allow create, update: if ownsNamespace(userId) && withinSizeLimits();
+        allow read, delete: if ownsNamespace(uid);
+        allow create, update: if ownsNamespace(uid) && sane();
 
-        match /{subCollection}/{docId} {
-          allow read, delete: if ownsNamespace(userId);
-          allow create, update: if ownsNamespace(userId) && withinSizeLimits();
+        match /{sub}/{docId} {
+          allow read, delete: if ownsNamespace(uid);
+          allow create, update: if ownsNamespace(uid) && sane();
         }
       }
 
+      // Legacy private leads. Retained read-only after the move to shared
+      // groups so the originals remain as a fallback, and cannot be altered by
+      // anything still pointing at the old location.
       match /leads/{leadId} {
-        allow read, delete: if ownsNamespace(userId);
-        allow create, update: if ownsNamespace(userId) && withinSizeLimits();
+        allow read, delete: if ownsNamespace(uid);
+        allow create, update: if ownsNamespace(uid) && sane();
       }
 
       match /documents/{documentId} {
-        allow read, delete: if ownsNamespace(userId);
-        allow create, update: if ownsNamespace(userId) && withinSizeLimits();
+        allow read, delete: if ownsNamespace(uid);
+        allow create, update: if ownsNamespace(uid) && sane();
       }
 
-      // Profile: name, accent colour, test scores, credential evaluations,
-      // recommenders, email templates, onboarding state.
       match /profile/{profileDoc} {
-        allow read, delete: if ownsNamespace(userId);
-        allow create, update: if ownsNamespace(userId) && withinSizeLimits();
+        allow read, delete: if ownsNamespace(uid);
+        allow create, update: if ownsNamespace(uid) && sane();
       }
 
-      // Any future collection under the owner's namespace stays owner-only
-      // rather than silently defaulting open.
       match /{collection}/{docId=**} {
-        allow read, write: if ownsNamespace(userId);
+        allow read, write: if ownsNamespace(uid);
       }
     }
 
-    // Everything outside /users is denied. No implicit public surface.
+    // ── Groups ───────────────────────────────────────────────────────────────
+
+    function groupDoc(gid) {
+      return get(/databases/$(database)/documents/groups/$(gid)).data;
+    }
+
+    function inGroup(gid) {
+      return approved()
+          && exists(/databases/$(database)/documents/groups/$(gid))
+          && (groupDoc(gid).members.keys().hasAny([request.auth.uid])
+              || groupDoc(gid).memberEmails.hasAny([email()]));
+    }
+
+    function groupAdmin(gid) {
+      return approved()
+          && exists(/databases/$(database)/documents/groups/$(gid))
+          && groupDoc(gid).createdBy == request.auth.uid;
+    }
+
+    match /groups/{gid} {
+      allow get: if inGroup(gid) || isAdmin();
+
+      // Listing is how a member finds the groups they belong to, so it is
+      // scoped by the query rather than forbidden outright. The query in the
+      // app filters on memberEmails; a query that does not is refused.
+      allow list: if approved();
+
+      // Creating a group makes you its administrator, and that must be true at
+      // creation — otherwise the creator could name someone else and leave a
+      // group with no one able to administer it.
+      allow create: if approved()
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.memberEmails.hasAny([email()])
+                    && request.resource.data.memberEmails.size() <= 25
+                    && sane()
+                    && shortText(request.resource.data.get('name', ''), 120);
+
+      // Only the group's own administrator may rename it or change who is in
+      // it — and may not hand `createdBy` to somebody else.
+      allow update: if (groupAdmin(gid) || isAdmin())
+                    && request.resource.data.createdBy == resource.data.createdBy
+                    && request.resource.data.memberEmails.size() <= 25
+                    && sane();
+
+      allow delete: if groupAdmin(gid) || isAdmin();
+
+      match /leads/{leadId} {
+        allow read: if inGroup(gid);
+
+        allow create: if inGroup(gid)
+                      && request.resource.data.addedBy == request.auth.uid
+                      && sane();
+
+        // Any member may correct a shared fact, and may write their own entry
+        // in the state map. Confining a member to their own key is not
+        // expressible here, so the group is trusted collectively — which is
+        // what a group of people who chose each other actually is.
+        allow update: if inGroup(gid) && sane();
+
+        // Removing a lead from everyone's board is the group administrator's
+        // decision. A member archives it for themselves instead, which writes
+        // only their own key.
+        allow delete: if groupAdmin(gid) || isAdmin();
+      }
+    }
+
+    // Everything else is refused. No implicit public surface.
     match /{document=**} {
       allow read, write: if false;
     }

@@ -15,7 +15,7 @@ import { isOverdue } from '../lib/datetime'
 import Modal from '../components/Modal'
 import LeadForm from '../components/LeadForm'
 import { CardGridSkeleton } from '../components/Skeleton'
-import { Button, EmptyState, Tooltip, Badge, cn } from '../components/ui'
+import { Button, EmptyState, Tooltip, Badge, cn, SafeLink } from '../components/ui'
 import {
   LeadStateBadge, PriorityBadge, DeadlineDisplay, CountryChip, UrgencyDot,
 } from '../components/domain'
@@ -90,16 +90,16 @@ function LeadCard({ lead, index, onEdit, onConvert, onArchive, onTriage }) {
 
       <div className="flex gap-3 text-xs">
         {lead.labUrl && (
-          <a href={lead.labUrl} target="_blank" rel="noreferrer"
+          <SafeLink href={lead.labUrl}
             className="text-sage-700 hover:underline inline-flex items-center gap-1">
             <ExternalLink size={11} aria-hidden="true" /> Lab
-          </a>
+          </SafeLink>
         )}
         {lead.linkedinPost && (
-          <a href={lead.linkedinPost} target="_blank" rel="noreferrer"
+          <SafeLink href={lead.linkedinPost}
             className="text-sky-600 hover:underline inline-flex items-center gap-1">
             <ExternalLink size={11} aria-hidden="true" /> Post
-          </a>
+          </SafeLink>
         )}
         {lead.source && <span className="text-ink-400 ml-auto">via {lead.source}</span>}
       </div>

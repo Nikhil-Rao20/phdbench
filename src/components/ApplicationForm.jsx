@@ -14,7 +14,7 @@ import {
   Field, Input, TextArea, Select, Combobox, CountrySelect,
   Segmented, Checkbox, DeadlineInput,
 } from './form'
-import { Button, SectionTitle, Progress, Tooltip, cn } from './ui'
+import { Button, SectionTitle, Progress, Tooltip, cn, SafeLink } from './ui'
 import { useDirty } from '../hooks/useDirty'
 
 const PRIORITY_OPTIONS = [
@@ -201,10 +201,10 @@ export default function ApplicationForm({ initial = {}, onSubmit, onCancel, onDi
             <div className="relative">
               <Input className="pr-10" value={form.labUrl} onChange={e => set('labUrl', e.target.value)} placeholder="https://…" />
               {form.labUrl && (
-                <a href={form.labUrl} target="_blank" rel="noreferrer" title="Open lab site"
+                <SafeLink href={form.labUrl} title="Open lab site"
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-sage-600">
                   <ExternalLink size={14} aria-hidden="true" />
-                </a>
+                </SafeLink>
               )}
             </div>
           </Field>
@@ -213,10 +213,10 @@ export default function ApplicationForm({ initial = {}, onSubmit, onCancel, onDi
               <Input className="pr-10" value={form.professorProfile}
                 onChange={e => set('professorProfile', e.target.value)} placeholder="https://…" />
               {form.professorProfile && (
-                <a href={form.professorProfile} target="_blank" rel="noreferrer" title="Open profile"
+                <SafeLink href={form.professorProfile} title="Open profile"
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-sage-600">
                   <ExternalLink size={14} aria-hidden="true" />
-                </a>
+                </SafeLink>
               )}
             </div>
           </Field>
@@ -285,10 +285,10 @@ export default function ApplicationForm({ initial = {}, onSubmit, onCancel, onDi
                   <Input className="pr-10" value={form.appUrl} onChange={e => set('appUrl', e.target.value)}
                     placeholder="https://apply.university.edu…" />
                   {form.appUrl && (
-                    <a href={form.appUrl} target="_blank" rel="noreferrer" title="Open portal"
+                    <SafeLink href={form.appUrl} title="Open portal"
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-sage-600">
                       <ExternalLink size={14} aria-hidden="true" />
-                    </a>
+                    </SafeLink>
                   )}
                 </div>
               </Field>
@@ -428,10 +428,10 @@ export default function ApplicationForm({ initial = {}, onSubmit, onCancel, onDi
             <Input className="pr-10" value={form.driveLink} onChange={e => set('driveLink', e.target.value)}
               placeholder="https://drive.google.com/drive/folders/…" />
             {form.driveLink && (
-              <a href={form.driveLink} target="_blank" rel="noreferrer" title="Open folder"
+              <SafeLink href={form.driveLink} title="Open folder"
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-sage-600">
                 <ExternalLink size={14} aria-hidden="true" />
-              </a>
+              </SafeLink>
             )}
           </div>
         </Field>

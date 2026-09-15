@@ -14,3 +14,9 @@ dev-dist/
 /screenshots/
 test-results/
 playwright-report/
+
+# Personal data exports. Real leads, applications and notes — never commit these
+# to a public repository.
+phdbench-backup-*.json
+*-backup-*.json
+backups/

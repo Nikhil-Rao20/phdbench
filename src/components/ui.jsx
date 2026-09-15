@@ -10,6 +10,7 @@ import { motion } from 'framer-motion'
 import { Loader2, Check, Info } from 'lucide-react'
 import { clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { safeUrl } from '../lib/safety'
 
 export const cn = (...inputs) => twMerge(clsx(inputs))
 
@@ -268,5 +269,36 @@ export function CopiedPill({ show }) {
     >
       <Check size={12} aria-hidden="true" /> Copied
     </motion.span>
+  )
+}
+
+/**
+ * An external link that refuses to be a weapon.
+ *
+ * Every URL in this app is typed by a person, and once leads are shared, by a
+ * *different* person than the one clicking. `safeUrl` rejects anything that is
+ * not http/https, so a `javascript:` URL saved into a shared lead cannot run in
+ * a teammate's authenticated session. An unsafe or empty value renders nothing
+ * at all rather than a dead link.
+ *
+ * `rel="noopener noreferrer"` is not optional on a target=_blank link: without
+ * noopener the opened page gets a handle on this one via window.opener and can
+ * navigate it somewhere convincing.
+ */
+export function SafeLink({ href, children, className, title, ...rest }) {
+  const safe = safeUrl(href)
+  if (!safe) return null
+
+  return (
+    <a
+      href={safe}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={title || safe}
+      className={className}
+      {...rest}
+    >
+      {children}
+    </a>
   )
 }
