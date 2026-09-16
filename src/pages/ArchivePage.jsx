@@ -2,9 +2,13 @@ import { useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Archive as ArchiveIcon, RotateCcw, Trash2, ShieldAlert } from 'lucide-react'
 import { useData, useUid } from '../hooks/useData'
+import { useGroups } from '../hooks/useGroups'
+import { useAuth } from '../hooks/useAuth'
+import { restoreLeadForMe, destroySharedLead } from '../lib/groupsDb'
+import { isGroupAdmin } from '../lib/access'
 import { useToast, useMutation } from '../hooks/useToast'
 import {
-  restoreLead, destroyLead, restoreApplication, destroyApplication,
+  restoreApplication, destroyApplication,
 } from '../lib/db'
 import { StageBadge, LeadStateBadge } from '../components/domain'
 import { Button, EmptyState, cn } from '../components/ui'
@@ -102,25 +106,44 @@ function ArchiveRow({ record, kind, onRestore, onDestroy }) {
 
 export default function ArchivePage() {
   const uid = useUid()
-  const { archivedLeads, archivedApplications } = useData()
+  const { archivedApplications } = useData()
+  // Leads live on the shared board now. Reading the private collection here
+  // showed the pre-migration copies while everything archived on the actual
+  // board was unreachable.
+  const { archivedLeads, active: group } = useGroups()
+  const { user } = useAuth()
   const toast = useToast()
   const mutate = useMutation()
 
   const items = useMemo(() => [
     ...archivedApplications.map(r => ({ record: r, kind: 'application' })),
     ...archivedLeads.map(r => ({ record: r, kind: 'lead' })),
-  ].sort((a, b) => (b.record.archivedAt?.seconds ?? 0) - (a.record.archivedAt?.seconds ?? 0)),
+  // Applications carry a Firestore timestamp; a shared lead's archive stamp is
+  // per person and stored as a plain millisecond number under `mine`. Normalise
+  // both to milliseconds so the two sort against each other correctly.
+  ].map(item => ({
+    ...item,
+    archivedAtMs: item.kind === 'application'
+      ? (item.record.archivedAt?.seconds ?? 0) * 1000
+      : (item.record.mine?.archivedAt ?? 0),
+  })).sort((a, b) => b.archivedAtMs - a.archivedAtMs),
   [archivedApplications, archivedLeads])
 
   const handleRestore = (record, kind) =>
     mutate(
-      () => (kind === 'application' ? restoreApplication(uid, record.id) : restoreLead(uid, record.id)),
+      () => (kind === 'application'
+        ? restoreApplication(uid, record.id)
+        : restoreLeadForMe(group.id, record.id, uid)),
       { success: `${record.university} restored.`, failure: 'Could not restore that.' },
     )
 
   const handleDestroy = (record, kind) =>
     mutate(
-      () => (kind === 'application' ? destroyApplication(uid, record.id) : destroyLead(uid, record.id)),
+      () => (kind === 'application'
+        ? destroyApplication(uid, record.id)
+        // Deleting a shared lead removes it for the whole group, so it stays
+        // the group administrator's call.
+        : destroySharedLead(group.id, record.id)),
       { success: `${record.university} deleted permanently.`, failure: 'Could not delete that.' },
     )
 

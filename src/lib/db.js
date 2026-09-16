@@ -93,48 +93,6 @@ export const subscribeFollowups = (uid, appId, onData, onError) =>
 export const subscribeActivity = (uid, appId, onData, onError) =>
   subscribeToCollection(subCol(uid, appId, 'activity'), 'createdAt', onData, onError)
 
-// ─── Leads ───────────────────────────────────────────────────────────────────
-
-export async function addLead(uid, data) {
-  const ref = await addDoc(userCol(uid, 'leads'), {
-    ...data,
-    state: data.state || LEAD_STATE.ACTIVE,
-    archivedAt: null,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  })
-  return ref.id
-}
-
-export function updateLead(uid, id, data) {
-  return updateDoc(userDoc(uid, 'leads', id), { ...data, updatedAt: serverTimestamp() })
-}
-
-/** Reversible. This is what the delete button actually calls. */
-export function archiveLead(uid, id) {
-  return updateDoc(userDoc(uid, 'leads', id), {
-    archivedAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  })
-}
-
-export function restoreLead(uid, id) {
-  return updateDoc(userDoc(uid, 'leads', id), {
-    archivedAt: deleteField(),
-    updatedAt: serverTimestamp(),
-  })
-}
-
-/** Irreversible. Only reachable from the Archive, behind a hold-to-confirm. */
-export function destroyLead(uid, id) {
-  return deleteDoc(userDoc(uid, 'leads', id))
-}
-
-/** Triage without deleting: rule a lead out but keep the record. */
-export function setLeadState(uid, id, state) {
-  return updateDoc(userDoc(uid, 'leads', id), { state, updatedAt: serverTimestamp() })
-}
-
 // ─── Applications ────────────────────────────────────────────────────────────
 
 export async function addApplication(uid, data) {
@@ -214,47 +172,6 @@ export async function destroyApplication(uid, id) {
   await deleteDoc(userDoc(uid, 'applications', id))
 }
 
-/**
- * Promote a lead into a full application.
- *
- * The important change from the previous version: the new application starts at
- * `in_progress`, not `applied`. Converting a lead means you have decided to
- * apply — it does not mean you have applied.
- */
-export async function promoteLeadToApplication(uid, leadId, extraData = {}) {
-  const leadSnap = await getDoc(userDoc(uid, 'leads', leadId))
-  if (!leadSnap.exists()) throw new Error('That lead no longer exists.')
-
-  const leadData = leadSnap.data()
-  const batch = writeBatch(db)
-  const appRef = doc(userCol(uid, 'applications'))
-
-  // Strip lead-only bookkeeping so it cannot masquerade as application state.
-  const { state, archivedAt, convertedToApp, createdAt, updatedAt, ...carried } = leadData
-
-  batch.set(appRef, {
-    ...carried,
-    ...extraData,
-    fromLeadId: leadId,
-    stage: extraData.stage || STAGE.IN_PROGRESS,
-    requiredDocs: extraData.requiredDocs || [],
-    submittedDocs: extraData.submittedDocs || {},
-    archivedAt: null,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  })
-
-  batch.update(userDoc(uid, 'leads', leadId), {
-    convertedToApp: appRef.id,
-    state: LEAD_STATE.CONVERTED,
-    updatedAt: serverTimestamp(),
-  })
-
-  await batch.commit()
-  await logActivity(uid, appRef.id, 'Converted from a saved lead', { system: true })
-  return appRef.id
-}
-
 // ─── Follow-ups ──────────────────────────────────────────────────────────────
 
 export async function addFollowup(uid, appId, data) {
@@ -264,10 +181,6 @@ export async function addFollowup(uid, appId, data) {
     createdAt: serverTimestamp(),
   })
   return ref.id
-}
-
-export function updateFollowup(uid, appId, fid, data) {
-  return updateDoc(subDoc(uid, appId, 'followups', fid), data)
 }
 
 export function deleteFollowup(uid, appId, fid) {
@@ -295,10 +208,6 @@ export async function logActivity(uid, appId, note, { system = false } = {}) {
 }
 
 export const addActivityEntry = (uid, appId, note) => logActivity(uid, appId, note, { system: false })
-
-export function deleteActivityEntry(uid, appId, aid) {
-  return deleteDoc(subDoc(uid, appId, 'activity', aid))
-}
 
 // ─── Documents ───────────────────────────────────────────────────────────────
 
@@ -388,11 +297,6 @@ export async function ensureDefaultDocuments(uid) {
 }
 
 // ─── Profile ─────────────────────────────────────────────────────────────────
-
-export async function getProfile(uid) {
-  const snap = await getDoc(profileDoc(uid))
-  return snap.exists() ? { id: snap.id, ...snap.data() } : null
-}
 
 export function saveProfile(uid, data) {
   // Merge, so a partial save never wipes fields it did not mention.

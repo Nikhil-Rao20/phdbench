@@ -18,7 +18,7 @@
 import {
   collection, doc, addDoc, setDoc, updateDoc, deleteDoc,
   getDocs, getDoc, onSnapshot, query, orderBy, where, limit, startAfter,
-  serverTimestamp, writeBatch, increment, arrayUnion, arrayRemove,
+  serverTimestamp, writeBatch, arrayUnion, arrayRemove,
 } from 'firebase/firestore'
 import { db } from './firebase'
 import { STAGE, LEAD_STATE } from './model'
@@ -32,8 +32,6 @@ const leadDoc = (gid, leadId) => doc(db, 'groups', gid, 'leads', leadId)
 const requestDoc = (uid) => doc(db, 'accessRequests', uid)
 const requestsCol = () => collection(db, 'accessRequests')
 
-/** Per-user counters, so the rules can enforce a cap without counting. */
-const countsDoc = (uid) => doc(db, 'users', uid, 'meta', 'counts')
 
 const snapToArray = (snap) => snap.docs.map(d => ({ id: d.id, ...d.data() }))
 
@@ -429,24 +427,3 @@ export async function convertSharedLead(gid, leadId, user, extra = {}) {
   return ref.id
 }
 
-// ─── Counters ────────────────────────────────────────────────────────────────
-
-/**
- * Read a person's usage counters, creating them at zero on first look.
- * These back the per-account caps; the admin is never limited.
- */
-export async function readCounts(uid) {
-  const snap = await getDoc(countsDoc(uid))
-  if (snap.exists()) return snap.data()
-  const zero = { applications: 0, leadsCreated: 0, updatedAt: serverTimestamp() }
-  await setDoc(countsDoc(uid), zero).catch(() => {})
-  return zero
-}
-
-export function bumpCount(uid, field, by = 1) {
-  return setDoc(
-    countsDoc(uid),
-    { [field]: increment(by), updatedAt: serverTimestamp() },
-    { merge: true },
-  )
-}

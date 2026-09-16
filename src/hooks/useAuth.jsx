@@ -5,7 +5,7 @@ import {
   getRedirectResult, signOut,
 } from 'firebase/auth'
 import { auth, provider } from '../lib/firebase'
-import { UI_HARNESS, isOwner } from '../lib/config'
+import { UI_HARNESS } from '../lib/config'
 import { harnessUser } from '../lib/harnessData'
 
 const AuthContext = createContext(null)
@@ -83,9 +83,6 @@ export function AuthProvider({ children }) {
     logout,
     error,
     signingIn,
-    /** Signed in, but not the account this tool belongs to. */
-    isAuthorized: UI_HARNESS ? true : Boolean(user && isOwner(user)),
-    isImpostor: Boolean(user && !UI_HARNESS && !isOwner(user)),
   }), [user, error, signingIn])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
