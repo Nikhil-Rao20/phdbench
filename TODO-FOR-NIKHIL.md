@@ -1,112 +1,58 @@
 # Things only you can do
 
-Nothing here blocks me — I'm carrying on regardless. These are the steps that
-need your hands, in the order they need doing.
+## Deployment — done, 16 Sep 2026
+
+- [x] Export a backup before touching anything
+- [x] Deploy the app code (Actions)
+- [x] Publish `firestore.rules` — admin address verified
+- [x] Create the `groups` composite index
+- [x] Sign in and confirm the data
+- [x] Create a group and copy the leads onto the shared board
+- [x] Export a fresh backup — `phdbench-backup-2026-09-16 (1).json`,
+      formatVersion 3, the first one containing the shared board
+- [x] Rules Playground: cross-account read denied, self-approval denied,
+      foreign group denied, own data allowed
+
+Live and verified.
 
 ---
 
-## 1. Before the new version goes live
+## When you want your friends on it
 
-- [x] **Export a backup.** Done — `phdbench-backup-2026-09-15.json`
-      (22 leads, 7 applications, 9 documents). It is gitignored, so it can never
-      reach the public repo. I've dry-run the migration against it: 22 leads
-      convert to 14 active / 7 already-applied / 1 ruled out, with all 12 notes
-      and all 17 deadlines intact.
+1. Send them https://nikhil-rao20.github.io/phdbench/
+2. They sign in and fill the request form
+3. You approve: sidebar → **Access** → Approve
+4. Invite them to the board: **Groups** → Invite someone → their email
 
-- [ ] **Deploy the app code first, then publish the rules.**
-      Order matters. The new rules require an approval record that the currently
-      deployed code does not create — publish them first and you lock yourself
-      out until the new code ships.
-
-      1. `git push origin main` (deploys via Actions, ~2 min)
-      2. Then publish the rules, below.
-
-- [ ] **Publish the Firestore rules.**
-      Console → **phdbench** → Firestore Database → **Rules** → paste the whole
-      of `firestore.rules` → **Publish**.
-
-      Sanity check before publishing: `adminEmail()` must read
-      `nikhil01446@gmail.com`. That is the one value that, if wrong, locks you
-      out of your own data at the database layer.
-
-- [ ] **Create the composite index.**
-      Console → Firestore → **Indexes** → Composite → Add:
-
-      | Collection | Field | Type |
-      |---|---|---|
-      | `groups` | `memberEmails` | Array contains |
-      | `groups` | `createdAt` | Ascending |
-
-      It is also in `firestore.indexes.json`. Without it, loading your groups
-      fails outright — not slowly, but with an error. Firebase will also print a
-      one-click link in the browser console the first time the query runs, which
-      is usually the easiest route.
+Two separate steps on purpose. Approving gives someone their own private
+workspace; inviting puts them on your board. Somebody can be approved without
+being in any of your groups.
 
 ---
 
-## 2. First run, in this order
+## Keep doing
 
-- [ ] **Sign in.** You are the admin, so you skip the request queue entirely.
-- [ ] **Create a group** (Groups → New group). Name it whatever you like —
-      "RGUKT PhD hunt" or similar.
-- [ ] **Copy your leads across.** Settings → the blue *Move your leads to a
-      shared board* panel → it shows you exactly what it will do, then copies.
-      Safe to run twice; it skips anything already copied.
-- [ ] **Check the board.** Your 7 already-applied leads should show as applied
-      for you, and your 14 active ones as active. Your applications should be
-      exactly as they were.
-- [ ] **Export a fresh backup** once you are satisfied.
+- **Export a backup every few weeks.** Settings → Export everything. The app
+  nags after 30 days. Firestore's free plan has no automated backup, so that
+  file is the only thing standing between you and total loss.
+- Keep the backup files out of the repo. They are gitignored already.
 
 ---
 
-## 3. Bringing your friends in
+## Known, deliberate
 
-- [ ] Send them the link. They sign in and fill the request form.
-- [ ] Approve them: sidebar → **Access** → Approve.
-- [ ] Invite them to your group: **Groups** → Invite someone → their email.
-
-Two separate steps on purpose — approving grants a private workspace, inviting
-adds them to a board. Someone can be approved without being in any of your
-groups.
-
----
-
-## 4. Security check I cannot run myself
-
-- [ ] **Test the rules in the Rules Playground.**
-      Console → Firestore → Rules → **Rules Playground**. The Firestore emulator
-      needs Java, which is not installed on this machine, so this is the one
-      layer I cannot execute. Worth running these four:
-
-      | Simulate | Expect |
-      |---|---|
-      | Read `/users/<some other uid>/applications/x` as yourself | **Denied** |
-      | Create `/accessRequests/<your uid>` with `status: "approved"` | **Denied** |
-      | Read `/groups/<a group you are not in>` | **Denied** |
-      | Read `/users/<your uid>/applications/x` as yourself | **Allowed** |
-
-      The first two are the ones that matter: they are the attacks a malicious
-      approved user would actually try.
+- **Harvard and Stanford** read Active on the board though you have
+  applications for them. You said you would fix those two by hand.
+- **Drive links are empty** on all 7 applications. Unused, not lost.
+- **Per-account caps** (500 leads, 500 applications) are enforced in the
+  interface and bounded in the rules by document shape and ownership, but the
+  rules do not count documents. Since access is granted by hand, the exposure is
+  an approved user deliberately exceeding their quota — visible and reversible.
+- **You are exempt from every cap.**
 
 ---
 
-## 5. Right after the first deploy — 30 seconds
+## Only if you ever remove the approval gate
 
-- [ ] **Open the browser console (F12) and look for red CSP errors.**
-      I added a Content Security Policy, which restricts what the page may load
-      and connect to. It is the single best defence against an injected script,
-      but it is also the change most likely to block something legitimate, and I
-      cannot test it against live Firebase from here — the harness runs without a
-      real Firestore connection.
-
-      If you see `Refused to connect to …` or `Refused to load …`, copy the line
-      and send it to me; it is a one-word fix to the policy in `index.html`.
-      If sign-in works and your leads appear, it is fine.
-
----
-
-## 6. Only if you ever remove the approval gate
-
-- [ ] **Firebase Blaze plan + budget cap.** Not needed while access is approved
-      by hand — you should stay comfortably inside the free tier. Required only
-      if you open signup to everyone.
+- [ ] Firebase Blaze plan with a budget cap. Not needed while access is approved
+      by hand — you should stay comfortably inside the free tier.
