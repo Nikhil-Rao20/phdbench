@@ -39,7 +39,7 @@ const APPLYING_TO = [
 
 function Shell({ children }) {
   return (
-    <div className="min-h-screen bg-ink-50 flex items-center justify-center p-4 sm:p-6">
+    <div className="h-full overflow-y-auto bg-ink-50 flex items-start sm:items-center justify-center p-4 sm:p-6">
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}

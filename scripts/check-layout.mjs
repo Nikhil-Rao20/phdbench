@@ -136,6 +136,23 @@ async function main() {
             (w ? `\n        widest: <${w.tag} class="${w.cls}"> w=${w.width} "${w.text}"` : ''),
           )
         }
+
+        // A second, vertical scrollbar on the document itself.
+        //
+        // The app scrolls inside <main>; the document must never scroll. When it
+        // did, scrolling past the content dragged the whole shell — sidebar
+        // included — upwards into a dead region below the app.
+        //
+        // Tested with a real wheel rather than window.scrollTo, because
+        // `overflow: hidden` still permits programmatic scrolling and would make
+        // a scripted check report a failure that no user could ever trigger.
+        await page.mouse.move(Math.floor(vp.w / 2), Math.floor(vp.h / 2))
+        for (let i = 0; i < 25; i++) await page.mouse.wheel(0, 800)
+        await page.waitForTimeout(250)
+        const windowScrolled = await page.evaluate(() => window.scrollY)
+        if (windowScrolled > 0) {
+          problems.push(`${route} — the document itself scrolls (window.scrollY=${windowScrolled}px). Two scrollbars.`)
+        }
       }
 
       if (problems.length) {
@@ -158,7 +175,7 @@ async function main() {
     console.log(`${failures.length} overflow problem(s). Nothing should scroll sideways at any width.`)
     process.exit(1)
   }
-  console.log('Nothing scrolls sideways at any width, in any scroll container.')
+  console.log('Clean at every width: nothing scrolls sideways, and the document itself never scrolls.')
 }
 
 main().catch(e => { console.error(e); process.exit(1) })

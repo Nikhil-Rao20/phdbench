@@ -123,7 +123,7 @@ export default function App() {
     return (
       <>
         <SEOManager isAuthenticated={false} />
-        <div className="min-h-screen flex items-center justify-center bg-ink-50">
+        <div className="h-full flex items-center justify-center bg-ink-50">
           <div className="flex flex-col items-center gap-4">
             <div className="w-8 h-8 border-2 border-ink-200 border-t-ink-900 rounded-full animate-spin" />
             <p className="text-sm text-ink-400">Checking your session…</p>
@@ -140,7 +140,7 @@ export default function App() {
     return (
       <>
         <SEOManager isAuthenticated={false} />
-        <div className="min-h-screen flex items-center justify-center bg-ink-50">
+        <div className="h-full flex items-center justify-center bg-ink-50">
           <div className="flex flex-col items-center gap-4">
             <div className="w-8 h-8 border-2 border-ink-200 border-t-ink-900 rounded-full animate-spin" />
             <p className="text-sm text-ink-400">Checking your access…</p>
@@ -155,8 +155,8 @@ export default function App() {
       <>
         <SEOManager isAuthenticated={!!user} />
         <div className={showLoginTransition
-          ? 'transition-all duration-500 blur-[6px] scale-[0.985] pointer-events-none'
-          : 'transition-all duration-500'}>
+          ? 'h-full transition-all duration-500 blur-[6px] scale-[0.985] pointer-events-none'
+          : 'h-full transition-all duration-500'}>
           <LoginPage />
         </div>
         <LoginSuccessOverlay

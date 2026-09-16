@@ -140,14 +140,14 @@ export default function LoginPage() {
   const { login, error } = useAuth()
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-ink-50">
+    <div className="relative h-full overflow-y-auto bg-ink-50">
       <MoleculeField className="pointer-events-none absolute inset-0 z-0 h-full w-full" />
 
       <div className="pointer-events-none absolute -top-32 -right-20 h-72 w-72 rounded-full bg-sage-200/60 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-40 -left-24 h-96 w-96 rounded-full bg-amber-200/50 blur-[90px]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-white/80 to-transparent" />
 
-      <div className="relative z-10 flex min-h-screen flex-col">
+      <div className="relative z-10 flex min-h-full flex-col">
         <header className="flex items-center justify-between px-6 pt-6 lg:px-12">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-ink-900 text-white flex items-center justify-center">

@@ -14,11 +14,30 @@
     --accent-light: #deeee6;
   }
 
+  /*
+   * The document itself never scrolls; the app scrolls inside <main>.
+   *
+   * Without this lock the page had TWO scrollbars. Once main's content grew
+   * past the viewport the document became scrollable as well, and scrolling it
+   * dragged the entire shell — sidebar included — upwards to reveal a dead
+   * region below the app. Setting a height alone is not enough: a single
+   * overflowing descendant is all it takes to make the document scrollable.
+   *
+   * Full-screen pages that legitimately need to scroll — sign-in, the access
+   * request form — scroll inside themselves with `h-full overflow-y-auto`.
+   */
+  html, body, #root {
+    height: 100%;
+    overflow: hidden;
+  }
+
   html { @apply font-body antialiased; }
 
   body {
     background-color: var(--bg-primary);
     color: var(--text-primary);
+    /* Stops the rubber-band bounce dragging a fixed shell around on touch. */
+    overscroll-behavior: none;
   }
 
   * { @apply border-ink-200; }
