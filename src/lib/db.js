@@ -491,13 +491,40 @@ export function clearNeedsReview(uid, appId) {
  * Firebase project itself being lost, misconfigured, or made unreachable by a
  * rules mistake. The output is plain JSON and readable without any of this app.
  */
-export async function exportEverything(uid) {
+/**
+ * Everything, including the shared boards.
+ *
+ * `groups` matters more than it looks. Once leads moved to shared boards, the
+ * private `leads` collection became only a historical fallback — the live data
+ * lives under `groups/{id}/leads`, and a backup that omitted it would quietly
+ * be a backup of last month's work. Each shared lead is written with its full
+ * per-person state map, so a restore preserves who had applied to what.
+ */
+export async function exportEverything(uid, { groups = [] } = {}) {
   const [leadsSnap, appsSnap, docsSnap, profileSnap] = await Promise.all([
     getDocs(userCol(uid, 'leads')),
     getDocs(userCol(uid, 'applications')),
     getDocs(userCol(uid, 'documents')),
     getDoc(profileDoc(uid)),
   ])
+
+  // Shared boards, one per group this person belongs to. A failure on any one
+  // group must not lose the rest of the backup, so each is caught separately
+  // and recorded as an error rather than thrown.
+  const sharedBoards = []
+  for (const group of groups) {
+    try {
+      const snap = await getDocs(collection(db, 'groups', group.id, 'leads'))
+      sharedBoards.push({
+        groupId: group.id,
+        groupName: group.name || '',
+        memberEmails: group.memberEmails || [],
+        leads: snapToArray(snap),
+      })
+    } catch (error) {
+      sharedBoards.push({ groupId: group.id, groupName: group.name || '', error: String(error?.message || error) })
+    }
+  }
 
   const applications = []
   for (const d of appsSnap.docs) {
@@ -515,14 +542,19 @@ export async function exportEverything(uid) {
 
   return {
     format: 'phdbench-backup',
-    formatVersion: 2,
+    formatVersion: 3,
     exportedAt: new Date().toISOString(),
     counts: {
       leads: leadsSnap.size,
       applications: appsSnap.size,
       documents: docsSnap.size,
+      sharedBoards: sharedBoards.length,
+      sharedLeads: sharedBoards.reduce((n, b) => n + (b.leads?.length || 0), 0),
     },
     profile: profileSnap.exists() ? profileSnap.data() : null,
+    // The live data since leads became shared.
+    sharedBoards,
+    // Retained as the pre-migration fallback, not the working copy.
     leads: snapToArray(leadsSnap),
     applications,
     documents: snapToArray(docsSnap),

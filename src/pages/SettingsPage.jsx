@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { useData, useUid } from '../hooks/useData'
 import { useAuth } from '../hooks/useAuth'
+import { useGroups } from '../hooks/useGroups'
 import { useToast, useMutation } from '../hooks/useToast'
 import { saveProfile, exportEverything, importBackup, migrateToV2 } from '../lib/db'
 import { downloadJSON } from '../lib/calendar'
@@ -290,6 +291,7 @@ function CredentialSection({ profile, onSave }) {
 // ─── Backup ──────────────────────────────────────────────────────────────────
 
 function BackupSection({ uid, profile, counts }) {
+  const { groups } = useGroups()
   const toast = useToast()
   const mutate = useMutation()
   const [busy, setBusy] = useState(false)
@@ -304,13 +306,13 @@ function BackupSection({ uid, profile, counts }) {
 
   const handleExport = async () => {
     setBusy(true)
-    const r = await mutate(() => exportEverything(uid), { failure: 'Could not build your backup.' })
+    const r = await mutate(() => exportEverything(uid, { groups }), { failure: 'Could not build your backup.' })
     if (r.ok) {
       const stamp = new Date().toISOString().slice(0, 10)
       downloadJSON(r.data, `phdbench-backup-${stamp}.json`)
       await saveProfile(uid, { lastExportAt: new Date() }).catch(() => {})
       toast.success(
-        `Backup downloaded — ${r.data.counts.applications} applications, ${r.data.counts.leads} leads.`,
+        `Backup downloaded — ${r.data.counts.applications} applications, ${r.data.counts.sharedLeads} shared leads across ${r.data.counts.sharedBoards} board${r.data.counts.sharedBoards === 1 ? '' : 's'}.`,
       )
     }
     setBusy(false)
