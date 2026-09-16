@@ -5,7 +5,7 @@
 // quietly start at zero.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { forwardRef } from 'react'
+import { forwardRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Loader2, Check, Info } from 'lucide-react'
 import { clsx } from 'clsx'
@@ -216,7 +216,22 @@ export function ErrorState({ title = 'Could not load this', description, onRetry
  * Charter #6: every icon-only control needs a name.
  * Deliberately CSS-only — no portal, no positioning library, no dependency.
  */
+/**
+ * A tooltip that exists only while it is being shown.
+ *
+ * The previous version kept the bubble in the DOM permanently and revealed it
+ * with opacity. That is the usual CSS-only approach and it was wrong here: an
+ * absolutely positioned element still expands an ancestor's *scrollable* area
+ * even at `opacity: 0`, so a 585px `whitespace-nowrap` label sitting inside a
+ * 390px phone screen made the page scroll sideways into empty space. It was
+ * invisible in every screenshot, because the thing causing it was invisible.
+ *
+ * Mounting on demand also means a touch device — where there is no hover and a
+ * tooltip can never be read anyway — renders nothing at all.
+ */
 export function Tooltip({ label, children, side = 'top', className }) {
+  const [open, setOpen] = useState(false)
+
   const position = {
     top:    'bottom-full left-1/2 -translate-x-1/2 mb-2',
     bottom: 'top-full left-1/2 -translate-x-1/2 mt-2',
@@ -224,22 +239,33 @@ export function Tooltip({ label, children, side = 'top', className }) {
     right:  'left-full top-1/2 -translate-y-1/2 ml-2',
   }[side]
 
+  if (!label) return children
+
   return (
-    <span className={cn('relative inline-flex group/tt', className)}>
+    <span
+      className={cn('relative inline-flex', className)}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocusCapture={() => setOpen(true)}
+      onBlurCapture={() => setOpen(false)}
+    >
       {children}
-      <span
-        role="tooltip"
-        className={cn(
-          'pointer-events-none absolute z-50 whitespace-nowrap rounded-lg px-2.5 py-1.5',
-          'bg-ink-900 text-white text-xs shadow-float',
-          'opacity-0 scale-95 transition-all duration-150',
-          'group-hover/tt:opacity-100 group-hover/tt:scale-100',
-          'group-focus-within/tt:opacity-100 group-focus-within/tt:scale-100',
-          position,
-        )}
-      >
-        {label}
-      </span>
+      {open && (
+        <span
+          role="tooltip"
+          className={cn(
+            'pointer-events-none absolute z-50 rounded-lg px-2.5 py-1.5',
+            'bg-ink-900 text-white text-xs shadow-float',
+            // Wraps instead of running off the screen. A long explanation is
+            // still readable on two lines; it is not readable off-screen.
+            'w-max max-w-[min(16rem,calc(100vw-2rem))] text-left',
+            'animate-fade-in',
+            position,
+          )}
+        >
+          {label}
+        </span>
+      )}
     </span>
   )
 }

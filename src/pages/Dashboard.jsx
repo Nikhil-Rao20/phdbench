@@ -163,7 +163,7 @@ export default function Dashboard() {
             <motion.section
               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2, duration: 0.3 }}
-              className="lg:col-span-2 bg-white rounded-2xl border border-ink-100 shadow-surface p-5"
+              className="lg:col-span-2 min-w-0 bg-white rounded-2xl border border-ink-100 shadow-surface p-5"
             >
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-display text-lg text-ink-900">What is coming</h2>
@@ -197,8 +197,8 @@ export default function Dashboard() {
                       >
                         <UrgencyDot value={record.deadline} />
                         <span className="min-w-0 flex-1">
-                          <span className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-ink-800 truncate">
+                          <span className="flex items-center gap-2 min-w-0">
+                            <span className="text-sm font-medium text-ink-800 truncate min-w-0">
                               {record.university}
                             </span>
                             {kind === 'lead' && (
@@ -230,7 +230,7 @@ export default function Dashboard() {
               transition={{ delay: 0.25, duration: 0.3 }}
               className="space-y-6"
             >
-              <div className="bg-white rounded-2xl border border-ink-100 shadow-surface p-5">
+              <div className="min-w-0 bg-white rounded-2xl border border-ink-100 shadow-surface p-5">
                 <h2 className="font-display text-lg text-ink-900 mb-4">Pipeline</h2>
                 <ul className="space-y-2.5">
                   {STAGE_ORDER.filter(s => applications.some(a => a.stage === s)).map(stage => {
@@ -260,7 +260,7 @@ export default function Dashboard() {
               </div>
 
               {cycleSpendINR > 0 && (
-                <div className="bg-white rounded-2xl border border-ink-100 shadow-surface p-5">
+                <div className="min-w-0 bg-white rounded-2xl border border-ink-100 shadow-surface p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <Wallet size={15} className="text-ink-400" aria-hidden="true" />
                     <h2 className="text-xs font-semibold text-ink-400 uppercase tracking-widest">

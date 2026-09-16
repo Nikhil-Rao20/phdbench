@@ -14,7 +14,8 @@
     "check": "node scripts/check-access-parity.mjs && vitest run && vite build",
     "check:access": "node scripts/check-access-parity.mjs",
     "check:modal": "node scripts/check-modal.mjs",
-    "verify": "npm run check && npm run shoot && node scripts/check-modal.mjs"
+    "verify": "npm run check && npm run shoot && node scripts/check-layout.mjs && node scripts/check-modal.mjs",
+    "check:layout": "node scripts/check-layout.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",
