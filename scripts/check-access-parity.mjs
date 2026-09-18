@@ -115,6 +115,26 @@ const invariants = [
     /removeAll\(\[email\(\)\]\)/,
     'the interface offers a "leave" action the server would otherwise refuse',
   ],
+  [
+    'a member may attach their own uid, and only their own',
+    /affectedKeys\(\)\.hasOnly\(\[request\.auth\.uid\]\)/,
+    'without it an invited member can never join, and the denied write retries in a loop',
+  ],
+  [
+    'self-claim cannot alter the membership list',
+    // The self-claim branch must hold memberEmails equal. Without that it is a
+    // route into a group you were never invited to, rather than a way to
+    // identify yourself in one you already belong to.
+    (text) => {
+      // Match the rule expression itself, not the prose above it — the comment
+      // explaining this rule also contains the word.
+      const i = text.indexOf('.affectedKeys().hasOnly([request.auth.uid])')
+      if (i === -1) return false
+      const branch = text.slice(Math.max(0, i - 700), i + 200)
+      return /request\.resource\.data\.memberEmails == resource\.data\.memberEmails/.test(branch)
+    },
+    'self-claim would otherwise be a way into a group you were not invited to',
+  ],
 ]
 
 for (const [name, pattern, why] of invariants) {

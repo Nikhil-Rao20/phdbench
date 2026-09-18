@@ -13,6 +13,7 @@ import { motion } from 'framer-motion'
 import { ArrowRightLeft, CheckCircle2, ShieldCheck, Copy, RefreshCw } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useGroups } from '../hooks/useGroups'
+import { useData } from '../hooks/useData'
 import { useMutation, useToast } from '../hooks/useToast'
 import { planGroupMigration, migrateLeadsToGroup } from '../lib/migrateToGroups'
 import { UI_HARNESS } from '../lib/config'
@@ -38,6 +39,7 @@ function Guarantee({ children }) {
 export default function LeadMigration() {
   const { user } = useAuth()
   const { groups, active, switchGroup } = useGroups()
+  const { allLeads } = useData()
   const mutate = useMutation()
   const toast = useToast()
 
@@ -49,20 +51,33 @@ export default function LeadMigration() {
 
   useEffect(() => { if (active?.id && !targetId) setTargetId(active.id) }, [active, targetId])
 
-  // Look before offering: if there is nothing to move, this whole section stays
-  // out of the way rather than inviting an action with no effect.
+  /**
+   * Whether there is anything at all in the old private collection.
+   *
+   * Read from the subscription the app already holds rather than a fresh query.
+   * This component used to run two `getDocs` every time Settings opened — for
+   * most people to discover there was nothing to do.
+   */
+  const hasLegacyLeads = (allLeads || []).length > 0
+
+  // Look before offering. A migration that has already run has nothing to say,
+  // so the section removes itself rather than sitting there permanently
+  // announcing a finished job — which is noise on a page you visit for other
+  // reasons.
   useEffect(() => {
-    if (UI_HARNESS || !user || !targetId) return
+    if (UI_HARNESS || !user || !targetId || !hasLegacyLeads) { setPlan(null); return undefined }
     let cancelled = false
     planGroupMigration(user.uid, targetId)
       .then(p => { if (!cancelled) setPlan(p) })
       .catch(() => { if (!cancelled) setPlan(null) })
     return () => { cancelled = true }
-  }, [user, targetId, done])
+  }, [user, targetId, hasLegacyLeads, done])
 
+  // Nothing to move, or everything already moved: render nothing at all.
+  // `done` keeps the confirmation on screen for the run that just happened, so
+  // the panel does not vanish mid-sentence at the moment it succeeds.
   if (!plan || plan.total === 0) return null
-
-  const nothingLeft = plan.toCopy === 0
+  if (plan.toCopy === 0 && !done) return null
 
   const run = async () => {
     setBusy(true)

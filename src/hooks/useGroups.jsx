@@ -78,16 +78,48 @@ export function GroupsProvider({ children }) {
     if (active?.id && active.id !== activeId) setActiveId(active.id)
   }, [active, activeId])
 
+  /**
+   * A stable identity for "which groups am I in".
+   *
+   * `subscribeMyGroups` delivers a brand-new array on every snapshot, so using
+   * `groups` itself in a dependency array re-runs the effect whenever anyone
+   * touches any group document — not only when the membership actually changes.
+   */
+  const groupIds = useMemo(() => (groups || []).map(g => g.id).sort().join('|'), [groups])
+  const groupsLoaded = groups !== null
+
   // An email-only invitation has no uid attached until the invitee first
   // arrives. Doing it here means they never have to be told to "accept" anything.
+  //
+  // Attempted at most once per group per session. Claiming WRITES to the group
+  // document, which produces a new snapshot, which — when this effect depended
+  // on the whole `groups` array — re-entered the effect and re-ran every other
+  // subscription with it. That feedback loop was the flicker, and it only
+  // affected people invited by email: whoever created the group already has
+  // their uid attached and never enters this path at all.
+  const claimedRef = useRef(new Set())
   useEffect(() => {
     if (UI_HARNESS || !user || !groups?.length) return
-    groups
-      .filter(g => !g.members?.[user.uid] && isMember(g, user))
-      .forEach(g => { claimMembership(g.id, user).catch(() => {}) })
-  }, [groups, user])
+    for (const group of groups) {
+      if (claimedRef.current.has(group.id)) continue
+      if (group.members?.[user.uid] || !isMember(group, user)) continue
+      claimedRef.current.add(group.id)
+      claimMembership(group.id, user).catch(() => {
+        // Let a genuine failure be retried on the next sign-in, not this render.
+      })
+    }
+  }, [groupIds, user])
 
   // ── Leads, first page live ────────────────────────────────────────────────
+  //
+  // Keyed on the active group id ONLY. Depending on the groups array rebuilt
+  // this subscription every time any group document changed — including the
+  // write this hook performs itself when claiming an invitation — and each
+  // rebuild flipped leadsLoading back to true, which is what flickered.
+  const activeGroupId = active?.id || null
+  const groupsLoadedRef = useRef(false)
+  useEffect(() => { groupsLoadedRef.current = groupsLoaded }, [groupsLoaded])
+
   useEffect(() => {
     if (UI_HARNESS) {
       setLeads(harnessGroupLeads())
@@ -96,9 +128,11 @@ export function GroupsProvider({ children }) {
       return undefined
     }
 
-    if (!active?.id) {
+    if (!activeGroupId) {
       setLeads([])
-      setLeadsLoading(groups === null)
+      // Still loading only while the group list itself has not arrived; with no
+      // groups at all this is a settled, empty state rather than a pending one.
+      setLeadsLoading(!groupsLoadedRef.current)
       setExhausted(true)
       return undefined
     }
@@ -108,7 +142,7 @@ export function GroupsProvider({ children }) {
     setExhausted(false)
 
     return subscribeLeadPage(
-      active.id,
+      activeGroupId,
       { pageSize: PAGE_SIZE },
       ({ leads: page, cursor: next, exhausted: done }) => {
         // Replaces rather than merges: this is the first page, and a lead
@@ -130,7 +164,7 @@ export function GroupsProvider({ children }) {
         )
       },
     )
-  }, [active?.id, groups])
+  }, [activeGroupId])
 
   const loadMore = useCallback(async () => {
     if (!active?.id || exhausted || loadingMore || !cursor) return

@@ -211,6 +211,27 @@ service cloud.firestore {
                     && request.resource.data.name == resource.data.name
                     && sane();
 
+      // A member may attach their own uid to the group on first sign-in.
+      //
+      // Invitations are issued by email, because the invitee has no uid until
+      // they first arrive. That entry is display metadata — names and roles
+      // shown on the Groups page — and it can only ever be written by the
+      // person it describes: `affectedKeys().hasOnly([uid])` confines the change
+      // to their own key, and the membership list, owner and name must be
+      // untouched, so this grants nothing beyond self-identification.
+      //
+      // Without it every invited member's claim was denied. Firestore applies a
+      // write locally before the server answers, so each denial produced a
+      // snapshot and then a rollback snapshot — and the retry loop that caused
+      // was visible as the whole app flickering and reloading.
+      allow update: if inGroup(gid)
+                    && request.resource.data.memberEmails == resource.data.memberEmails
+                    && request.resource.data.createdBy == resource.data.createdBy
+                    && request.resource.data.name == resource.data.name
+                    && request.resource.data.members.diff(resource.data.members)
+                         .affectedKeys().hasOnly([request.auth.uid])
+                    && sane();
+
       allow delete: if groupAdmin(gid) || isAdmin();
 
       match /leads/{leadId} {
